@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitIA | Seguimiento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-block" href="index.html">
+        <div class="brand-mark">LI</div>
+        <div>
+          <p class="eyebrow">Emdersoft S.A.C.</p>
+          <h1>LicitIA</h1>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="index.html">Dashboard</a>
+        <a class="nav-item" href="oportunidades.html">Oportunidades</a>
+        <a class="nav-item active" href="seguimiento.html">Seguimiento</a>
+        <a class="nav-item" href="alertas.html">Alertas</a>
+      </nav>
+
+      <div class="sidebar-card">
+        <p class="eyebrow">Objetivo</p>
+        <h2>Orden operativo</h2>
+        <p>Este modulo ayuda a saber quien hace que, que procesos estan atrasados y cuales vencen pronto.</p>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <p class="eyebrow">Gestion operativa</p>
+          <h2>Seguimiento de procesos, responsables y proximos vencimientos</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary-button" type="button" data-demo-message="Se reasigno la bandeja al equipo comercial para revision.">Reasignar carga</button>
+          <button class="primary-button" type="button" data-demo-message="Se actualizaron estados y fechas del tablero de seguimiento.">Actualizar estados</button>
+          <div class="account-actions">
+            <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
+            <div class="user-chip">ES</div>
+          </div>
+        </div>
+      </header>
+
+      <section class="summary-strip">
+        <article class="panel-card">
+          <p class="eyebrow">En revision</p>
+          <strong>9</strong>
+          <span>procesos esperando validacion</span>
+        </article>
+        <article class="panel-card">
+          <p class="eyebrow">Preparando propuesta</p>
+          <strong>11</strong>
+          <span>con documentos en construccion</span>
+        </article>
+        <article class="panel-card">
+          <p class="eyebrow">Postulados</p>
+          <strong>14</strong>
+          <span>en seguimiento de resultado</span>
+        </article>
+      </section>
+
+      <section class="board-grid">
+        <article class="board-column">
+          <div class="board-column-header">
+            <h3>En revision</h3>
+            <p>Requieren validar bases o coincidencia.</p>
+          </div>
+          <div class="board-card">
+            <div class="board-card-head">
+              <div>
+                <h4>LP-2026-014</h4>
+                <p>Midis</p>
+              </div>
+              <span class="status active">Alta</span>
+            </div>
+            <p>Validar experiencia especifica y alcance del soporte requerido.</p>
+          </div>
+          <div class="board-card">
+            <div class="board-card-head">
+              <div>
+                <h4>AS-2026-087</h4>
+                <p>Gore Arequipa</p>
+              </div>
+              <span class="status review">Media</span>
+            </div>
+            <p>Revision de bases y matriz de cumplimiento tecnico.</p>
+          </div>
+        </article>
+
+        <article class="board-column">
+          <div class="board-column-header">
+            <h3>Preparando propuesta</h3>
+            <p>Documentos y coordinacion interna.</p>
+          </div>
+          <div class="board-card">
+            <div class="board-card-head">
+              <div>
+                <h4>AMC-2026-041</h4>
+                <p>Sunat</p>
+              </div>
+              <span class="status active">Alta</span>
+            </div>
+            <p>Se esta armando la oferta tecnica y el cronograma de entregables.</p>
+          </div>
+          <div class="board-card">
+            <div class="board-card-head">
+              <div>
+                <h4>CP-2026-115</h4>
+                <p>EsSalud</p>
+              </div>
+              <span class="status review">Media</span>
+            </div>
+            <p>Falta consolidar anexos y validar propuesta economica.</p>
+          </div>
+        </article>
+
+        <article class="board-column">
+          <div class="board-column-header">
+            <h3>Postulados</h3>
+            <p>Esperando adjudicacion o respuesta.</p>
+          </div>
+          <div class="board-card">
+            <div class="board-card-head">
+              <div>
+                <h4>CP-2026-102</h4>
+                <p>Reniec</p>
+              </div>
+              <span class="status done">Enviado</span>
+            </div>
+            <p>Oferta presentada. Se espera siguiente evento en cronograma oficial.</p>
+          </div>
+          <div class="board-card">
+            <div class="board-card-head">
+              <div>
+                <h4>LP-2026-008</h4>
+                <p>Sunarp</p>
+              </div>
+              <span class="status done">Enviado</span>
+            </div>
+            <p>Seguimiento de observaciones y publicacion de resultados.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Carga del equipo</p>
+              <h3>Responsables actuales</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Responsable</th>
+                  <th>Procesos</th>
+                  <th>Siguiente accion</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Sofia Ruiz</td>
+                  <td>6</td>
+                  <td>Coordinar propuesta tecnica</td>
+                  <td><span class="status active">Carga alta</span></td>
+                </tr>
+                <tr>
+                  <td>Equipo legal</td>
+                  <td>4</td>
+                  <td>Revisar bases integradas</td>
+                  <td><span class="status review">En revision</span></td>
+                </tr>
+                <tr>
+                  <td>Comercial</td>
+                  <td>8</td>
+                  <td>Validar afinidad y monto</td>
+                  <td><span class="status active">Activo</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Fechas cercanas</p>
+              <h3>Vencimientos</h3>
+            </div>
+          </div>
+          <ul class="activity-list">
+            <li>
+              <strong>LP-2026-014</strong>
+              <span>Cierra en 48 horas. Falta validacion final del area tecnica.</span>
+            </li>
+            <li>
+              <strong>AMC-2026-041</strong>
+              <span>Entrega de propuesta en 3 dias. Falta anexar experiencia.</span>
+            </li>
+            <li>
+              <strong>CP-2026-115</strong>
+              <span>Reunion interna manana para definir precio final.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

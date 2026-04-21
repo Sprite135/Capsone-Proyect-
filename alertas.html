@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitIA | Alertas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-block" href="index.html">
+        <div class="brand-mark">LI</div>
+        <div>
+          <p class="eyebrow">Emdersoft S.A.C.</p>
+          <h1>LicitIA</h1>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="index.html">Dashboard</a>
+        <a class="nav-item" href="oportunidades.html">Oportunidades</a>
+        <a class="nav-item" href="seguimiento.html">Seguimiento</a>
+        <a class="nav-item active" href="alertas.html">Alertas</a>
+      </nav>
+
+      <div class="sidebar-card">
+        <p class="eyebrow">Centro de eventos</p>
+        <h2>36 reglas</h2>
+        <p>Este modulo concentra reglas, canales y envios para que el equipo reciba avisos a tiempo sin revisar todo manualmente.</p>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <p class="eyebrow">Notificaciones</p>
+          <h2>Centro para crear reglas, previsualizar mensajes y revisar el historial de envios</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary-button" type="button" data-demo-message="Se envio una prueba del mensaje al correo del equipo comercial.">Enviar prueba</button>
+          <button class="primary-button" type="button" data-demo-message="La regla de notificacion quedo creada y activa.">Guardar regla</button>
+          <div class="account-actions">
+            <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
+            <div class="user-chip">ES</div>
+          </div>
+        </div>
+      </header>
+
+      <section class="summary-strip">
+        <article class="panel-card">
+          <p class="eyebrow">Reglas activas</p>
+          <strong>36</strong>
+          <span>automatizaciones funcionando hoy</span>
+        </article>
+        <article class="panel-card">
+          <p class="eyebrow">Enviadas hoy</p>
+          <strong>28</strong>
+          <span>correo, panel y recordatorios</span>
+        </article>
+        <article class="panel-card">
+          <p class="eyebrow">Pendientes</p>
+          <strong>5</strong>
+          <span>alertas que el equipo aun no revisa</span>
+        </article>
+      </section>
+
+      <section class="alert-layout">
+        <div class="detail-stack">
+          <article class="panel-card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Nueva regla</p>
+                <h3>Asi se veria el apartado para enviar notificaciones</h3>
+              </div>
+              <span class="tag">Borrador</span>
+            </div>
+
+            <div class="builder-grid">
+              <div class="builder-block">
+                <div class="topbar-mini">
+                  <div>
+                    <p class="eyebrow">Disparador</p>
+                    <h4>Nueva oportunidad con alta afinidad</h4>
+                  </div>
+                  <span class="status active">Activo</span>
+                </div>
+                <p>Se activa cuando aparece una licitacion nueva con afinidad IA mayor a 85% y estado recomendado.</p>
+              </div>
+
+              <div class="builder-block">
+                <div class="topbar-mini">
+                  <div>
+                    <p class="eyebrow">Condiciones</p>
+                    <h4>Filtros aplicados</h4>
+                  </div>
+                  <span class="metric-pill">3 filtros</span>
+                </div>
+                <div class="badge-list">
+                  <span class="tag">Rubro: Tecnologia</span>
+                  <span class="tag">Ubicacion: Lima</span>
+                  <span class="tag">Monto: mayor a S/ 200,000</span>
+                </div>
+              </div>
+
+              <div class="builder-block">
+                <div class="topbar-mini">
+                  <div>
+                    <p class="eyebrow">Destinatarios</p>
+                    <h4>Equipo comercial</h4>
+                  </div>
+                  <span class="metric-pill">4 usuarios</span>
+                </div>
+                <p>La regla notificaria a comercial, gerencia y al responsable del seguimiento asignado.</p>
+              </div>
+
+              <div class="builder-block">
+                <div class="topbar-mini">
+                  <div>
+                    <p class="eyebrow">Frecuencia</p>
+                    <h4>Envio inmediato</h4>
+                  </div>
+                  <span class="status review">Sin resumen</span>
+                </div>
+                <p>Cuando el evento ocurre, el sistema manda el aviso en el momento y lo registra en historial.</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Historial</p>
+                <h3>Ultimos envios generados por reglas</h3>
+              </div>
+            </div>
+            <ul class="activity-list">
+              <li>
+                <strong>Correo enviado a comercial</strong>
+                <span>Se notifico que ME-2026-001 supero 94% de afinidad y cumple el rango de monto.</span>
+              </li>
+              <li>
+                <strong>Recordatorio de cierre</strong>
+                <span>LP-2026-014 fue enviado al panel y correo por vencer en menos de 48 horas.</span>
+              </li>
+              <li>
+                <strong>Cambio de cronograma</strong>
+                <span>El equipo legal recibio alerta por actualizacion de bases en AS-2026-087.</span>
+              </li>
+              <li>
+                <strong>Resumen diario compartido</strong>
+                <span>Gerencia recibio un consolidado con alertas criticas, nuevas oportunidades y seguimientos.</span>
+              </li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="side-stack">
+          <article class="panel-card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Canales</p>
+                <h3>Distribucion disponible</h3>
+              </div>
+            </div>
+            <ul class="channel-list">
+              <li class="channel-item">
+                <strong>Panel interno</strong>
+                <span>Aparece al ingresar al dashboard y queda marcado como pendiente hasta revisarlo.</span>
+              </li>
+              <li class="channel-item">
+                <strong>Correo inmediato</strong>
+                <span>Se envia cuando la regla es critica o cuando el proceso necesita accion rapida.</span>
+              </li>
+              <li class="channel-item">
+                <strong>Resumen diario</strong>
+                <span>Entrega un consolidado ejecutivo con nuevas oportunidades, cierres y cambios de estado.</span>
+              </li>
+              <li class="channel-item">
+                <strong>Recordatorio por vencimiento</strong>
+                <span>Se dispara automaticamente 72, 48 o 24 horas antes del cierre.</span>
+              </li>
+            </ul>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Vista previa</p>
+                <h3>Mensaje que recibira el usuario</h3>
+              </div>
+              <span class="tag">Email</span>
+            </div>
+            <div class="preview-card">
+              <div class="preview-line">
+                <span>Asunto</span>
+                <strong>Nueva oportunidad priorizada detectada</strong>
+              </div>
+              <div class="preview-line">
+                <span>Destinatarios</span>
+                <strong>comercial@emdersoft.com, gerencia@emdersoft.com</strong>
+              </div>
+              <div class="preview-message">
+                <p>Se detecto la licitacion <strong>ME-2026-001</strong> del Ministerio de Educacion.</p>
+                <p>Afinidad IA: <strong>94%</strong>. Monto estimado: <strong>S/ 450,000</strong>. Cierre: <strong>15 may</strong>.</p>
+                <p>Accion sugerida: abrir el detalle y mover a seguimiento para revision comercial.</p>
+              </div>
+              <div class="inline-actions">
+                <button class="secondary-button small-button" type="button" data-demo-message="La vista previa se envio al correo de prueba.">Enviar prueba</button>
+                <button class="secondary-button small-button" type="button" data-demo-message="Se actualizo la plantilla del mensaje.">Editar plantilla</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Reglas activas</p>
+                <h3>Ejemplos de automatizacion</h3>
+              </div>
+            </div>
+            <ul class="rule-list">
+              <li class="rule-item">
+                <strong>Coincidencia mayor a 85%</strong>
+                <span>Dispara correo y panel al equipo comercial cuando la oportunidad entra como recomendada.</span>
+              </li>
+              <li class="rule-item">
+                <strong>Cierre en menos de 72 horas</strong>
+                <span>Marca el proceso como urgente y genera recordatorio a seguimiento y legal.</span>
+              </li>
+              <li class="rule-item">
+                <strong>Cambio de cronograma o bases</strong>
+                <span>Notifica a los responsables con prioridad media y deja registro en historial.</span>
+              </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

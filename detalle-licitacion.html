@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitIA | Detalle de Licitacion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-block" href="index.html">
+        <div class="brand-mark">LI</div>
+        <div>
+          <p class="eyebrow">Emdersoft S.A.C.</p>
+          <h1>LicitIA</h1>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="index.html">Dashboard</a>
+        <a class="nav-item active" href="oportunidades.html">Oportunidades</a>
+        <a class="nav-item" href="seguimiento.html">Seguimiento</a>
+        <a class="nav-item" href="alertas.html">Alertas</a>
+      </nav>
+
+      <div class="sidebar-card">
+        <p class="eyebrow">Vista interna</p>
+        <h2>Detalle</h2>
+        <p>Esta pantalla ayuda a decidir si conviene postular, que riesgos existen y cuales son los siguientes pasos.</p>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <div class="breadcrumb">
+            <a href="index.html">Dashboard</a>
+            <span>/</span>
+            <a href="oportunidades.html">Oportunidades</a>
+            <span>/</span>
+            <span id="detailBreadcrumbCode">LP-2026-014</span>
+          </div>
+          <p class="eyebrow">Detalle del proceso</p>
+          <h2 id="detailHeading">LP-2026-014 | Servicio de soporte y mantenimiento TI</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary-button" type="button" data-demo-message="Se descargo el resumen IA en formato PDF.">Descargar resumen IA</button>
+          <button class="primary-button" type="button" data-demo-message="El proceso paso al modulo de seguimiento del equipo.">Mover a seguimiento</button>
+          <div class="account-actions">
+            <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
+            <div class="user-chip">ES</div>
+          </div>
+        </div>
+      </header>
+
+      <div class="page-tabs">
+        <a class="active" href="#resumen">Resumen</a>
+        <a href="#ia">Analisis IA</a>
+        <a href="#documentos">Documentos</a>
+        <a href="#historial">Historial</a>
+      </div>
+
+      <section class="detail-layout">
+        <div class="detail-stack">
+          <article class="panel-card detail-block" id="resumen">
+            <div class="detail-header">
+              <div>
+                <p class="eyebrow">Resumen general</p>
+                <h3 id="detailInsightTitle">Ajuste fuerte con experiencia previa del equipo</h3>
+              </div>
+              <span class="score high" id="detailScore">96%</span>
+            </div>
+            <p id="detailSummary">
+              El proceso presenta alto encaje comercial por tipo de servicio, ticket estimado y antecedentes de proyectos similares.
+              La recomendacion es continuar con revision tecnica y validar requisitos de experiencia especifica.
+            </p>
+            <div class="detail-meta">
+              <div><span>Entidad</span><strong id="detailEntity">Midis</strong></div>
+              <div><span>Monto estimado</span><strong id="detailAmount">S/ 480,000</strong></div>
+              <div><span>Cierre</span><strong id="detailClosingDate">25 abril</strong></div>
+              <div><span>Modalidad</span><strong id="detailModality">Licitacion publica</strong></div>
+            </div>
+          </article>
+
+          <article class="panel-card detail-block" id="ia">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Analisis IA</p>
+                <h3>Motivos de la recomendacion</h3>
+              </div>
+              <span class="tag">Confianza alta</span>
+            </div>
+            <div class="check-list">
+              <div class="check-item">
+                <span class="check-mark">1</span>
+                <div>
+                  <strong>Rubro coincidente</strong>
+                  <p>El objeto del proceso se alinea con servicios de soporte TI y mesa de ayuda ya atendidos.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">2</span>
+                <div>
+                  <strong>Ticket compatible</strong>
+                  <p>El monto esperado se ubica dentro del rango objetivo definido para el equipo comercial.</p>
+                </div>
+              </div>
+              <div class="check-item">
+                <span class="check-mark">3</span>
+                <div>
+                  <strong>Riesgo moderado</strong>
+                  <p>Las bases exigen experiencia especifica que debe confirmarse antes de preparar la propuesta.</p>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel-card detail-block" id="documentos">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Documentos y tareas</p>
+                <h3>Checklist de preparacion</h3>
+              </div>
+            </div>
+            <ul class="plain-list">
+              <li>Revisar bases integradas y cronograma oficial.</li>
+              <li>Validar constancias de experiencia especifica del proveedor.</li>
+              <li>Preparar propuesta tecnica y matriz de cumplimiento.</li>
+              <li>Coordinar carta de presentacion y anexos obligatorios.</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="side-stack">
+          <article class="panel-card detail-block">
+            <p class="eyebrow">Ficha rapida</p>
+            <div class="info-list">
+              <div class="info-item"><strong>Estado actual</strong><span id="detailStatus">En analisis</span></div>
+              <div class="info-item"><strong>Responsable sugerido</strong><span>Equipo comercial + soporte tecnico</span></div>
+              <div class="info-item"><strong>Region</strong><span id="detailLocation">Lima</span></div>
+              <div class="info-item"><strong>Nivel de urgencia</strong><span id="detailUrgency">Alto</span></div>
+            </div>
+          </article>
+
+          <article class="panel-card detail-block" id="historial">
+            <p class="eyebrow">Historial</p>
+            <ul class="activity-list">
+              <li>
+                <strong>Clasificado por IA</strong>
+                <span>La afinidad paso de 88% a 96% luego del ultimo ajuste de reglas.</span>
+              </li>
+              <li>
+                <strong>Comentado por comercial</strong>
+                <span>Se recomendo evaluar el proceso por similitud con proyectos previos.</span>
+              </li>
+              <li>
+                <strong>Pendiente de legal</strong>
+                <span>Falta revisar clausulas de cumplimiento especifico.</span>
+              </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitIA | Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-block" href="index.html">
+        <div class="brand-mark">LI</div>
+        <div>
+          <p class="eyebrow">Emdersoft S.A.C.</p>
+          <h1>LicitIA</h1>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item active" href="index.html">Dashboard</a>
+        <a class="nav-item" href="oportunidades.html">Oportunidades</a>
+        <a class="nav-item" href="seguimiento.html">Seguimiento</a>
+        <a class="nav-item" href="alertas.html">Alertas</a>
+      </nav>
+
+      <div class="sidebar-card">
+        <p class="eyebrow">Motor IA</p>
+        <h2>Activo</h2>
+        <p>Analiza convocatorias del SEACE, estima afinidad comercial y prioriza licitaciones para el equipo.</p>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <p class="eyebrow">Vista general</p>
+          <h2>Dashboard ejecutivo para monitorear oportunidades, alertas y actividad del equipo</h2>
+        </div>
+        <div class="topbar-actions">
+          <div class="search-box">Buscar por entidad, rubro o palabra clave</div>
+          <button class="secondary-button" type="button" data-demo-message="Resumen exportado. El tablero quedaria listo para compartir con gerencia.">Exportar resumen</button>
+          <button class="primary-button" type="button" data-demo-message="Analisis actualizado. Se recalculo la afinidad de convocatorias y se generaron nuevas alertas.">Actualizar analisis</button>
+          <div class="account-actions">
+            <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
+            <div class="user-chip">ES</div>
+          </div>
+        </div>
+      </header>
+
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Decision rapida</p>
+          <h3>Un punto de entrada para saber que procesos conviene mirar primero.</h3>
+          <p class="description">
+            El dashboard queda como portada del sistema: resume el volumen de convocatorias, las
+            mejores coincidencias, el estado del seguimiento y las alertas que exigen accion inmediata.
+          </p>
+          <div class="hero-tags">
+            <span>Resumen ejecutivo</span>
+            <span>Recomendacion IA</span>
+            <span>Seguimiento activo</span>
+          </div>
+        </div>
+
+        <div class="hero-highlight">
+          <p class="eyebrow">Hoy</p>
+          <strong>18 oportunidades</strong>
+          <ul class="summary-list">
+            <li>7 procesos con prioridad alta</li>
+            <li>3 cierres dentro de 48 horas</li>
+            <li>5 alertas nuevas para revision</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card">
+          <p>Convocatorias activas</p>
+          <strong>126</strong>
+          <span>+14 desde ayer</span>
+        </article>
+        <article class="stat-card">
+          <p>Coincidencia promedio</p>
+          <strong>92%</strong>
+          <span>sobre la lista recomendada</span>
+        </article>
+        <article class="stat-card">
+          <p>Procesos en seguimiento</p>
+          <strong>34</strong>
+          <span>6 con fecha limite esta semana</span>
+        </article>
+        <article class="stat-card">
+          <p>Alertas emitidas</p>
+          <strong>51</strong>
+          <span>correo, panel y recordatorios</span>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Radar de oportunidades</p>
+              <h3>Procesos destacados por el motor inteligente</h3>
+            </div>
+            <a class="text-link" href="oportunidades.html">Ver modulo completo</a>
+          </div>
+
+          <div class="opportunity-list">
+            <article class="opportunity-card">
+              <div class="opportunity-top">
+                <div>
+                  <h4>Servicio de soporte y mantenimiento TI</h4>
+                  <p>Ministerio de Desarrollo e Inclusion Social</p>
+                </div>
+                <span class="score high">96%</span>
+              </div>
+              <div class="meta-row">
+                <span>Monto estimado: S/ 480,000</span>
+                <span>Cierre: 25 abril</span>
+                <span>Rubro: Software y soporte</span>
+              </div>
+              <div class="inline-actions">
+                <a class="text-link" href="detalle-licitacion.html">Ver detalle</a>
+                <button class="secondary-button small-button" type="button" data-demo-message="Proceso agregado al seguimiento del equipo comercial.">Agregar a seguimiento</button>
+              </div>
+            </article>
+
+            <article class="opportunity-card">
+              <div class="opportunity-top">
+                <div>
+                  <h4>Implementacion de plataforma documental</h4>
+                  <p>Gobierno Regional de Arequipa</p>
+                </div>
+                <span class="score medium">88%</span>
+              </div>
+              <div class="meta-row">
+                <span>Monto estimado: S/ 310,000</span>
+                <span>Cierre: 28 abril</span>
+                <span>Rubro: Transformacion digital</span>
+              </div>
+              <div class="inline-actions">
+                <a class="text-link" href="detalle-licitacion.html">Ver detalle</a>
+                <button class="secondary-button small-button" type="button" data-demo-message="Se guardo la oportunidad en la bandeja de revision.">Guardar</button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Actividad del equipo</p>
+              <h3>Ultimos movimientos</h3>
+            </div>
+            <a class="text-link" href="seguimiento.html">Ir a seguimiento</a>
+          </div>
+
+          <ul class="activity-list">
+            <li>
+              <strong>Nuevo proceso priorizado</strong>
+              <span>LP-2026-014 fue movido a prioridad alta por coincidencia de 96%.</span>
+            </li>
+            <li>
+              <strong>Bases en revision</strong>
+              <span>El equipo legal esta revisando documentos del proceso AS-2026-087.</span>
+            </li>
+            <li>
+              <strong>Oferta enviada</strong>
+              <span>CP-2026-102 paso a estado postulacion enviada.</span>
+            </li>
+            <li>
+              <strong>Reporte compartido</strong>
+              <span>Se envio un resumen diario al equipo comercial y gerencia.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="bottom-grid">
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Flujo recomendado</p>
+              <h3>Como se usa el sistema en el dia a dia</h3>
+            </div>
+          </div>
+          <div class="mini-steps">
+            <div><strong>1.</strong><span>Revisar el dashboard para detectar urgencias.</span></div>
+            <div><strong>2.</strong><span>Entrar a oportunidades para filtrar y comparar procesos.</span></div>
+            <div><strong>3.</strong><span>Abrir el detalle para analizar bases, riesgos y ajuste comercial.</span></div>
+            <div><strong>4.</strong><span>Pasar a seguimiento para asignar tareas y monitorear avances.</span></div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Alertas</p>
+              <h3>Centro de eventos</h3>
+            </div>
+            <a class="text-link" href="alertas.html">Abrir alertas</a>
+          </div>
+          <div class="mini-stats">
+            <div>
+              <strong>3</strong>
+              <span>criticas</span>
+            </div>
+            <div>
+              <strong>12</strong>
+              <span>pendientes</span>
+            </div>
+            <div>
+              <strong>36</strong>
+              <span>reglas activas</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

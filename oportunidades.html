@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitIA | Oportunidades</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-block" href="index.html">
+        <div class="brand-mark">LI</div>
+        <div>
+          <p class="eyebrow">Emdersoft S.A.C.</p>
+          <h1>LicitIA</h1>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="index.html">Dashboard</a>
+        <a class="nav-item active" href="oportunidades.html">Oportunidades</a>
+        <a class="nav-item" href="seguimiento.html">Seguimiento</a>
+        <a class="nav-item" href="alertas.html">Alertas</a>
+      </nav>
+
+      <div class="sidebar-card">
+        <p class="eyebrow">Enfoque recomendado</p>
+        <h2>Alta afinidad</h2>
+        <p>Prioriza procesos con ticket medio mayor a S/ 250,000 y entidades con historico favorable.</p>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <p class="eyebrow">Modulo principal</p>
+          <h2>Oportunidades para filtrar, comparar y abrir el detalle de cada licitacion</h2>
+        </div>
+        <div class="topbar-actions">
+          <input class="search-box search-input" id="opportunitySearch" type="search" placeholder="Buscar procesos, entidades o rubros">
+          <button class="secondary-button" type="button" data-demo-message="Filtros guardados. La bandeja personalizada quedaria lista para el usuario.">Guardar filtros</button>
+          <button class="primary-button" type="button" data-demo-message="Se sincronizo la lista con nuevas convocatorias del SEACE.">Sincronizar SEACE</button>
+          <div class="account-actions">
+            <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
+            <div class="user-chip">ES</div>
+          </div>
+        </div>
+      </header>
+
+      <section class="summary-strip">
+        <article class="panel-card">
+          <p class="eyebrow">Coincidencias altas</p>
+          <strong id="summaryHighMatch">0</strong>
+          <span>procesos con mas de 85% de afinidad</span>
+        </article>
+        <article class="panel-card">
+          <p class="eyebrow">Prioridad alta</p>
+          <strong id="summaryPriority">0</strong>
+          <span>oportunidades marcadas como urgentes</span>
+        </article>
+        <article class="panel-card">
+          <p class="eyebrow">Total cargadas</p>
+          <strong id="summaryTotal">0</strong>
+          <span>oportunidades obtenidas desde la API</span>
+        </article>
+      </section>
+
+      <section class="results-layout">
+        <div class="panel-card filter-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Filtros</p>
+              <h3>Busqueda inteligente</h3>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <h4>Rubros</h4>
+            <div class="chip-row">
+              <button class="chip active" type="button" data-filter-group="category" data-filter-value="Todos">Todos</button>
+              <button class="chip" type="button" data-filter-group="category" data-filter-value="Software">Software</button>
+              <button class="chip" type="button" data-filter-group="category" data-filter-value="Transformacion digital">Transformacion digital</button>
+              <button class="chip" type="button" data-filter-group="category" data-filter-value="Mesa de ayuda">Mesa de ayuda</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <h4>Rango de monto</h4>
+            <div class="option-list">
+              <div class="option-item"><span>Hasta S/ 200,000</span><span>14</span></div>
+              <div class="option-item"><span>S/ 200,000 a S/ 500,000</span><span>38</span></div>
+              <div class="option-item"><span>Mas de S/ 500,000</span><span>11</span></div>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <h4>Ubicacion</h4>
+            <div class="chip-row">
+              <button class="chip active" type="button" data-filter-group="location" data-filter-value="Todos">Todos</button>
+              <button class="chip" type="button" data-filter-group="location" data-filter-value="Lima">Lima</button>
+              <button class="chip" type="button" data-filter-group="location" data-filter-value="Regiones">Regiones</button>
+              <button class="chip" type="button" data-filter-group="location" data-filter-value="Nacional">Nacional</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Resultados</p>
+              <h3>Bandeja priorizada</h3>
+              <p class="help-copy" id="opportunityMeta">Cargando oportunidades desde la API...</p>
+            </div>
+            <div class="page-tabs">
+              <a class="active" href="oportunidades.html">Recomendadas</a>
+              <a href="oportunidades.html">Recientes</a>
+              <a href="oportunidades.html">Favoritas</a>
+            </div>
+          </div>
+
+          <div class="result-list" id="opportunityResults"></div>
+        </div>
+      </section>
+
+      <p id="message" class="message" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

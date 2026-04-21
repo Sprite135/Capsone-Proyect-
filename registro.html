@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LicitIA | Registro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-shell">
+      <section class="auth-side">
+        <p class="eyebrow">Registro de usuario</p>
+        <h1>Crea una cuenta y configura tu flujo de seguimiento de licitaciones.</h1>
+        <p class="lead">
+          Esta pantalla simula el alta de usuarios dentro de la plataforma para centralizar convocatorias, alertas y recomendaciones.
+        </p>
+
+        <div class="benefits">
+          <div class="benefit">
+            <strong>Configuracion inicial</strong>
+            <span>Define intereses, rubros, zonas y ticket esperado desde el principio.</span>
+          </div>
+          <div class="benefit">
+            <strong>Roles y permisos</strong>
+            <span>Administra accesos para analistas, responsables comerciales y jefaturas.</span>
+          </div>
+          <div class="benefit">
+            <strong>Experiencia guiada</strong>
+            <span>Deja lista la cuenta para empezar a recibir oportunidades priorizadas.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-main">
+        <div class="top-links">
+          <a class="back-link" href="home.html">Volver al inicio</a>
+          <a class="switch-link" href="login.html">Ir a login</a>
+        </div>
+
+        <p class="eyebrow">Registro</p>
+        <h2>Crea tu cuenta</h2>
+        <p class="help-text">La pantalla ahora puede registrar usuarios directamente contra SQL Server.</p>
+
+        <form class="auth-form" data-auth-form="register">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="registerName">Nombre completo</label>
+              <input id="registerName" name="fullName" type="text" placeholder="Tu nombre" autocomplete="name" required>
+            </div>
+            <div class="form-field">
+              <label for="registerCompany">Empresa</label>
+              <input id="registerCompany" name="companyName" type="text" placeholder="Emdersoft S.A.C." autocomplete="organization" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="registerEmail">Correo</label>
+              <input id="registerEmail" name="email" type="email" placeholder="correo@empresa.com" autocomplete="email" required>
+            </div>
+            <div class="form-field">
+              <label for="registerRole">Rol</label>
+              <select id="registerRole" name="role">
+                <option>Administrador</option>
+                <option>Analista</option>
+                <option>Comercial</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field password-field">
+            <label for="registerPassword">Contrasena</label>
+            <div class="password-wrap">
+              <input id="registerPassword" name="password" type="password" placeholder="Crea una contrasena segura" autocomplete="new-password" required>
+              <button type="button" class="password-toggle" aria-label="Mostrar contraseña" aria-pressed="false">
+                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a22.84 22.84 0 0 1 5.06-6.06M9.88 9.88A3 3 0 0 0 14.12 14.12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M1 1l22 22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <button class="primary-button" type="submit">Crear cuenta</button>
+          <p class="form-status" id="formStatus" aria-live="polite"></p>
+        </form>
+
+        <p class="footer-link">
+          Ya tienes cuenta? <a href="login.html">Inicia sesion aqui</a>.
+        </p>
+      </section>
+    </div>
+  </main>
+  <script src="auth-client.js"></script>
+</body>
+</html>
