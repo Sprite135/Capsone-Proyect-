@@ -31,9 +31,10 @@ public sealed class OpportunityRepository
                 Summary,
                 Location,
                 IsPriority,
-                PublishedDate
+                PublishedDate,
+                SeaceIndex
             FROM dbo.Opportunities
-            ORDER BY PublishedDate DESC, OpportunityId DESC;
+            ORDER BY SeaceIndex ASC;
             """;
 
         await using var command = new SqlCommand(sql, connection);
@@ -67,7 +68,8 @@ public sealed class OpportunityRepository
                 Summary,
                 Location,
                 IsPriority,
-                PublishedDate
+                PublishedDate,
+                SeaceIndex
             FROM dbo.Opportunities
             WHERE OpportunityId = @OpportunityId;
             """;
@@ -103,7 +105,8 @@ public sealed class OpportunityRepository
                 Summary,
                 Location,
                 IsPriority,
-                PublishedDate
+                PublishedDate,
+                SeaceIndex
             FROM dbo.Opportunities
             WHERE ProcessCode = @ProcessCode;
             """;
@@ -161,7 +164,8 @@ public sealed class OpportunityRepository
                 Summary,
                 Location,
                 IsPriority,
-                PublishedDate
+                PublishedDate,
+                SeaceIndex
             )
             VALUES
             (
@@ -176,7 +180,8 @@ public sealed class OpportunityRepository
                 @Summary,
                 @Location,
                 @IsPriority,
-                @PublishedDate
+                @PublishedDate,
+                @SeaceIndex
             );
             """;
 
@@ -193,6 +198,7 @@ public sealed class OpportunityRepository
         command.Parameters.AddWithValue("@Location", opportunity.Location);
         command.Parameters.AddWithValue("@IsPriority", opportunity.IsPriority);
         command.Parameters.AddWithValue("@PublishedDate", opportunity.PublishedDate);
+        command.Parameters.AddWithValue("@SeaceIndex", opportunity.SeaceIndex);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -237,6 +243,7 @@ public sealed class OpportunityRepository
             Summary = reader.GetString(reader.GetOrdinal("Summary")),
             Location = reader.GetString(reader.GetOrdinal("Location")),
             IsPriority = reader.GetBoolean(reader.GetOrdinal("IsPriority")),
-            PublishedDate = reader.IsDBNull(reader.GetOrdinal("PublishedDate")) ? null : reader.GetDateTime(reader.GetOrdinal("PublishedDate"))
+            PublishedDate = reader.IsDBNull(reader.GetOrdinal("PublishedDate")) ? null : reader.GetDateTime(reader.GetOrdinal("PublishedDate")),
+            SeaceIndex = reader.IsDBNull(reader.GetOrdinal("SeaceIndex")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("SeaceIndex"))
         };
 }

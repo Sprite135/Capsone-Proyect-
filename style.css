@@ -776,6 +776,12 @@ td,
 .status.critical {
   color: #ffb5b5;
   background: rgba(255, 107, 107, 0.14);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
 .activity-list,
@@ -1111,6 +1117,104 @@ td,
   padding: 2px 4px;
   border-radius: 3px;
   font-weight: 600;
+}
+
+/* Tracking filters */
+.filter-dropdown {
+  padding: 16px 0 0 0;
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+}
+
+.filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.filter-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-option label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.filter-option select,
+.filter-option input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pagination-btn:hover {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.table-wrap {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.card-indicator {
+  display: inline-block;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #1a1a1a;
+  padding: 4px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 6px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.result-card {
+  position: relative;
 }
 
 /* Tag Editor - Layout dos columnas tipo LicitaLAB */

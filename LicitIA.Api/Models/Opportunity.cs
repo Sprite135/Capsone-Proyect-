@@ -27,4 +27,6 @@ public sealed class Opportunity
     public bool IsPriority { get; init; }
 
     public DateTime? PublishedDate { get; init; }
+
+    public int? SeaceIndex { get; init; }
 }

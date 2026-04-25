@@ -127,25 +127,20 @@ function isOpportunityUrgent(closingDate) {
 }
 
 function getOpportunityTrackingStatus(opportunityId) {
-  const trackingStatuses = JSON.parse(localStorage.getItem('trackingStatuses') || '{}');
-  return trackingStatuses[opportunityId] || '';
-}
-
-function setOpportunityTrackingStatus(opportunityId, status) {
-  const trackingStatuses = JSON.parse(localStorage.getItem('trackingStatuses') || '{}');
-  trackingStatuses[opportunityId] = status;
-  localStorage.setItem('trackingStatuses', JSON.stringify(trackingStatuses));
+  const tracking = JSON.parse(localStorage.getItem('opportunityTracking') || '{}');
+  return tracking[opportunityId] || '';
 }
 
 function getTrackingStatusClass(status) {
-  const statusClasses = {
-    'review': 'status-review',
-    'preparing': 'status-preparing',
-    'submitted': 'status-submitted',
-    'won': 'status-won',
-    'lost': 'status-lost'
+  const classes = {
+    '': '',
+    'review': 'review',
+    'preparing': 'preparing',
+    'submitted': 'submitted',
+    'won': 'won',
+    'lost': 'lost'
   };
-  return statusClasses[status] || '';
+  return classes[status] || '';
 }
 
 function toggleFavorite(opportunityId) {
@@ -224,6 +219,252 @@ if (opportunitiesContainer) {
 
 if (detailHeading) {
   loadOpportunityDetail();
+}
+
+// Load tracking page
+if (document.getElementById('trackingBoard')) {
+  loadTrackingBoard();
+}
+
+async function loadTrackingBoard() {
+  try {
+    // Cargar todas las oportunidades
+    const response = await fetch(`${API_BASE}/api/opportunities`);
+    const data = await response.json().catch(() => []);
+    const allOpportunities = Array.isArray(data) ? data : [];
+
+    // Obtener oportunidades en favoritos (seguimiento)
+    const favoriteIds = JSON.parse(localStorage.getItem('favoriteOpportunities') || '[]');
+    const favoriteOpportunities = allOpportunities.filter(op => favoriteIds.includes(op.opportunityId));
+
+    // Guardar para filtros
+    trackingAllOpportunities = favoriteOpportunities;
+
+    // Obtener estados de tracking
+    const trackingStatus = JSON.parse(localStorage.getItem('opportunityTracking') || '{}');
+
+    // Agrupar por estado
+    const review = favoriteOpportunities.filter(op => (trackingStatus[op.opportunityId] || '') === 'review');
+    const preparing = favoriteOpportunities.filter(op => (trackingStatus[op.opportunityId] || '') === 'preparing');
+    const submitted = favoriteOpportunities.filter(op => (trackingStatus[op.opportunityId] || '') === 'submitted');
+
+    // Renderizar columnas
+    renderTrackingColumn('tracking-review', review);
+    renderTrackingColumn('tracking-preparing', preparing);
+    renderTrackingColumn('tracking-submitted', submitted);
+
+    // Actualizar contadores
+    document.querySelector('article.panel-card:nth-child(1) strong').textContent = review.length;
+    document.querySelector('article.panel-card:nth-child(2) strong').textContent = preparing.length;
+    document.querySelector('article.panel-card:nth-child(3) strong').textContent = submitted.length;
+
+    // Renderizar tabla de seguimiento
+    renderTrackingTable(favoriteOpportunities, trackingStatus);
+  } catch (error) {
+    console.error('Error loading tracking board:', error);
+  }
+}
+
+function renderTrackingTable(opportunities, trackingStatus) {
+  const tbody = document.getElementById('trackingTableBody');
+  if (!tbody) return;
+
+  if (opportunities.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No hay procesos en seguimiento</td></tr>';
+    updateTrackingPagination(0);
+    return;
+  }
+
+  // Paginación
+  const totalPages = Math.ceil(opportunities.length / trackingItemsPerPage);
+  const startIndex = (trackingCurrentPage - 1) * trackingItemsPerPage;
+  const endIndex = startIndex + trackingItemsPerPage;
+  const pageData = opportunities.slice(startIndex, endIndex);
+
+  tbody.innerHTML = pageData.map((op, index) => {
+    const status = trackingStatus[op.opportunityId] || '';
+    const statusText = {
+      '': 'Pendiente',
+      'review': 'En revisión',
+      'preparing': 'Preparando propuesta',
+      'submitted': 'Postulado',
+      'won': 'Ganado',
+      'lost': 'Perdido'
+    }[status] || 'Pendiente';
+
+    // Número correlativo (1-7 en página 1, 8-14 en página 2, etc.)
+    const lineNumber = startIndex + index + 1;
+
+    return `
+      <tr>
+        <td>${lineNumber}</td>
+        <td>${escapeHtml(op.processCode)}</td>
+        <td>${escapeHtml(op.summary || op.title)}</td>
+        <td>${escapeHtml(op.entityName)}</td>
+        <td>${escapeHtml(op.category || 'N/A')}</td>
+        <td>${formatCurrency(op.estimatedAmount)}</td>
+        <td>$ 0</td>
+        <td>${op.closingDate ? formatDate(op.closingDate) : 'N/A'}</td>
+        <td><span class="status review">${statusText}</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  updateTrackingPagination(totalPages);
+}
+
+function updateTrackingPagination(totalPages) {
+  const pageInfo = document.getElementById('trackingPageInfo');
+  const prevBtn = document.getElementById('prevTrackingPage');
+  const nextBtn = document.getElementById('nextTrackingPage');
+
+  if (!pageInfo) return;
+
+  if (totalPages === 0) {
+    pageInfo.textContent = 'Página 1 de 1';
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    return;
+  }
+
+  pageInfo.textContent = `Página ${trackingCurrentPage} de ${totalPages}`;
+  prevBtn.disabled = trackingCurrentPage === 1;
+  nextBtn.disabled = trackingCurrentPage === totalPages;
+}
+
+function previousTrackingPage() {
+  if (trackingCurrentPage > 1) {
+    trackingCurrentPage--;
+    const trackingStatus = JSON.parse(localStorage.getItem('opportunityTracking') || '{}');
+    renderTrackingTable(trackingFilteredOpportunities.length > 0 ? trackingFilteredOpportunities : trackingAllOpportunities, trackingStatus);
+  }
+}
+
+function nextTrackingPage() {
+  const opportunities = trackingFilteredOpportunities.length > 0 ? trackingFilteredOpportunities : trackingAllOpportunities;
+  const totalPages = Math.ceil(opportunities.length / trackingItemsPerPage);
+  
+  if (trackingCurrentPage < totalPages) {
+    trackingCurrentPage++;
+    const trackingStatus = JSON.parse(localStorage.getItem('opportunityTracking') || '{}');
+    renderTrackingTable(opportunities, trackingStatus);
+  }
+}
+
+// Tracking filters functions
+let trackingAllOpportunities = [];
+let trackingFilteredOpportunities = [];
+let trackingCurrentPage = 1;
+const trackingItemsPerPage = 7;
+
+function toggleFilterDropdown() {
+  const dropdown = document.getElementById('filterDropdown');
+  if (dropdown) {
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function applyTrackingFilters() {
+  const type = document.getElementById('typeFilter')?.value || 'all';
+  const status = document.getElementById('statusFilter')?.value || 'all';
+  const minorContract = document.getElementById('minorContractFilter')?.value || 'all';
+  const object = document.getElementById('objectFilter')?.value?.toLowerCase() || '';
+  const view = document.getElementById('viewFilter')?.value || 'all';
+  const line = document.getElementById('lineFilter')?.value || 'all';
+  const tag = document.getElementById('tagFilter')?.value?.toLowerCase() || '';
+  const search = document.getElementById('searchFilter')?.value?.toLowerCase() || '';
+
+  const trackingStatus = JSON.parse(localStorage.getItem('opportunityTracking') || '{}');
+
+  let filtered = trackingAllOpportunities.filter(op => {
+    // Type filter
+    if (type !== 'all' && op.category !== type) return false;
+
+    // Status filter (simplified - using tracking status)
+    const opTrackingStatus = trackingStatus[op.opportunityId] || '';
+    if (view !== 'all' && opTrackingStatus !== view) return false;
+
+    // Object filter
+    if (object && !op.summary?.toLowerCase().includes(object) && !op.title?.toLowerCase().includes(object)) return false;
+
+    // Search filter (ID or keyword)
+    if (search && !op.processCode?.toLowerCase().includes(search) && 
+        !op.title?.toLowerCase().includes(search) && 
+        !op.summary?.toLowerCase().includes(search)) return false;
+
+    return true;
+  });
+
+  trackingFilteredOpportunities = filtered;
+  renderTrackingTable(filtered, trackingStatus);
+  
+  // Ocultar dropdown después de aplicar
+  document.getElementById('filterDropdown').style.display = 'none';
+}
+
+function clearTrackingFilters() {
+  document.getElementById('typeFilter').value = 'all';
+  document.getElementById('statusFilter').value = 'all';
+  document.getElementById('minorContractFilter').value = 'all';
+  document.getElementById('objectFilter').value = '';
+  document.getElementById('viewFilter').value = 'all';
+  document.getElementById('lineFilter').value = 'all';
+  document.getElementById('tagFilter').value = '';
+  document.getElementById('searchFilter').value = '';
+  
+  const trackingStatus = JSON.parse(localStorage.getItem('opportunityTracking') || '{}');
+  renderTrackingTable(trackingAllOpportunities, trackingStatus);
+  
+  // Ocultar dropdown después de limpiar
+  document.getElementById('filterDropdown').style.display = 'none';
+}
+
+function importOpportunities() {
+  setMessage('Importando oportunidades desde SEACE...');
+  fetch(`${API_BASE}/api/seace/refresh`, { method: 'POST' })
+    .then(response => response.json())
+    .then(data => {
+      setMessage(`Importación completada: ${data.count} oportunidades`);
+      loadTrackingBoard();
+    })
+    .catch(error => {
+      setMessage('Error al importar oportunidades');
+      console.error(error);
+    });
+}
+
+// Expose functions globally for onclick handlers
+window.toggleFilterDropdown = toggleFilterDropdown;
+window.applyTrackingFilters = applyTrackingFilters;
+window.clearTrackingFilters = clearTrackingFilters;
+window.importOpportunities = importOpportunities;
+window.previousTrackingPage = previousTrackingPage;
+window.nextTrackingPage = nextTrackingPage;
+
+function renderTrackingColumn(containerId, opportunities) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (opportunities.length === 0) {
+    container.innerHTML = '<p class="empty-state">No hay procesos en esta categoría</p>';
+    return;
+  }
+
+  container.innerHTML = opportunities.map(op => `
+    <div class="board-card">
+      <div class="board-card-head">
+        <div>
+          <h4>${escapeHtml(op.processCode)}</h4>
+          <p>${escapeHtml(op.entityName)}</p>
+        </div>
+        <span class="status active">${formatCurrency(op.estimatedAmount)}</span>
+      </div>
+      <p>${escapeHtml(op.summary || op.title)}</p>
+      <div class="board-card-actions">
+        <a class="text-link" href="detalle-licitacion.html?id=${op.opportunityId}">Ver detalle</a>
+      </div>
+    </div>
+  `).join('');
 }
 
 async function loadProfile() {
@@ -550,7 +791,7 @@ function renderOpportunities() {
     return;
   }
 
-  opportunitiesContainer.innerHTML = paginatedItems.map((item) => createOpportunityMarkup(item)).join("");
+  opportunitiesContainer.innerHTML = paginatedItems.map((item, index) => createOpportunityMarkup(item, index)).join("");
 
   // Add pagination controls
   renderPaginationControls(totalPages);
@@ -747,7 +988,7 @@ function getUrgencyLabel(score) {
   return "Bajo";
 }
 
-function createOpportunityMarkup(item) {
+function createOpportunityMarkup(item, index) {
   const scoreClass = getScoreClass(item.matchScore);
   const statusChip = item.isPriority
     ? '<span class="status active">Prioridad alta</span>'
@@ -761,11 +1002,19 @@ function createOpportunityMarkup(item) {
   const trackingStatus = getOpportunityTrackingStatus(item.opportunityId);
   const trackingStatusClass = getTrackingStatusClass(trackingStatus);
 
+  // Calcular número correlativo
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const lineNumber = startIndex + index + 1;
+
   return `
     <article class="result-card">
       <div class="result-top">
         <div>
-          <h4>${escapeHtml(item.processCode)} | ${escapeHtml(item.title)}</h4>
+          <h4>
+            <span class="card-indicator">${lineNumber}</span>
+            ${escapeHtml(item.processCode)} | ${escapeHtml(item.title)}
+            ${urgencyChip}
+          </h4>
           <p>${escapeHtml(item.entityName)}</p>
         </div>
         <div class="result-header-actions">

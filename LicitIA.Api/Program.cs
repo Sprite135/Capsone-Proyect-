@@ -556,8 +556,9 @@ app.MapPost("/api/oece/refresh", async (
 
         // Guardar las oportunidades
         int savedCount = 0;
-        foreach (var oece in oeceOpportunities)
+        for (int i = 0; i < oeceOpportunities.Count; i++)
         {
+            var oece = oeceOpportunities[i];
             var opportunity = new Opportunity
             {
                 ProcessCode = oece.ProcessCode,
@@ -571,7 +572,8 @@ app.MapPost("/api/oece/refresh", async (
                 Summary = oece.Description,
                 Location = "Lima",
                 IsPriority = false,
-                PublishedDate = oece.PublishedDate
+                PublishedDate = oece.PublishedDate,
+                SeaceIndex = i + 1 // Índice original de SEACE/OECE
             };
 
             await repository.InsertOpportunityAsync(opportunity, cancellationToken);
@@ -688,8 +690,9 @@ app.MapPost("/api/seace/refresh", async (
         // Guardar las oportunidades con scores de afinidad
         int savedCount = 0;
         int skippedCount = 0;
-        foreach (var scraped in rankedOpportunities)
+        for (int i = 0; i < rankedOpportunities.Count; i++)
         {
+            var scraped = rankedOpportunities[i];
             try
             {
                 var opportunity = new Opportunity
@@ -705,7 +708,8 @@ app.MapPost("/api/seace/refresh", async (
                     Summary = scraped.Description,
                     Location = scraped.Location,
                     IsPriority = scraped.MatchScore >= 85,
-                    PublishedDate = scraped.PublishedDate
+                    PublishedDate = scraped.PublishedDate,
+                    SeaceIndex = i + 1
                 };
                 await repository.InsertOpportunityAsync(opportunity, cancellationToken);
                 savedCount++;

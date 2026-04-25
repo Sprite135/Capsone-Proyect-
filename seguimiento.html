@@ -51,6 +51,117 @@
         </div>
       </header>
 
+      <section class="panel-card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Filtros</p>
+            <h3>Filtrar oportunidades</h3>
+          </div>
+          <div class="header-actions">
+            <button class="primary-button" type="button" onclick="toggleFilterDropdown()">Filtrar</button>
+            <button class="secondary-button" type="button" onclick="importOpportunities()">Importar oportunidades</button>
+          </div>
+        </div>
+        <div class="filter-dropdown" id="filterDropdown" style="display: none;">
+          <div class="filter-options">
+            <div class="filter-option">
+              <label>Tipo</label>
+              <select id="typeFilter">
+                <option value="all">Todos</option>
+                <option value="Bien">Bien</option>
+                <option value="Servicio">Servicio</option>
+                <option value="Obra">Obra</option>
+              </select>
+            </div>
+            <div class="filter-option">
+              <label>Estado Licitación</label>
+              <select id="statusFilter">
+                <option value="all">Todos</option>
+                <option value="Convocado">Convocado</option>
+                <option value="En proceso">En proceso</option>
+                <option value="Adjudicado">Adjudicado</option>
+              </select>
+            </div>
+            <div class="filter-option">
+              <label>Estado Contrato Menor</label>
+              <select id="minorContractFilter">
+                <option value="all">Todos</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="En proceso">En proceso</option>
+                <option value="Finalizado">Finalizado</option>
+              </select>
+            </div>
+            <div class="filter-option">
+              <label>Objeto de Contratación</label>
+              <input type="text" id="objectFilter" placeholder="Buscar objeto...">
+            </div>
+            <div class="filter-option">
+              <label>Ver</label>
+              <select id="viewFilter">
+                <option value="all">Todos</option>
+                <option value="review">En revisión</option>
+                <option value="preparing">Preparando propuesta</option>
+                <option value="submitted">Postulado</option>
+              </select>
+            </div>
+            <div class="filter-option">
+              <label>Líneas de Negocio</label>
+              <select id="lineFilter">
+                <option value="all">Todas</option>
+                <option value="Software">Software</option>
+                <option value="Infraestructura">Infraestructura</option>
+                <option value="Consultoría">Consultoría</option>
+              </select>
+            </div>
+            <div class="filter-option">
+              <label>Etiquetas</label>
+              <input type="text" id="tagFilter" placeholder="Buscar etiquetas...">
+            </div>
+            <div class="filter-option">
+              <label>Buscar</label>
+              <input type="text" id="searchFilter" placeholder="ID o palabra clave...">
+            </div>
+          </div>
+          <div class="filter-actions">
+            <button class="primary-button" type="button" onclick="applyTrackingFilters()">Aplicar</button>
+            <button class="secondary-button" type="button" onclick="clearTrackingFilters()">Limpiar</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Lista de seguimiento</p>
+            <h3>Procesos en seguimiento</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>N</th>
+                <th>Identificador convocatoria</th>
+                <th>Descripción de objeto</th>
+                <th>Entidad</th>
+                <th>Tipo</th>
+                <th>Monto disponible</th>
+                <th>Monto ofertado</th>
+                <th>Presentación de ofertas</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="trackingTableBody">
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="trackingPagination">
+          <button class="pagination-btn" onclick="previousTrackingPage()" id="prevTrackingPage">Anterior</button>
+          <span id="trackingPageInfo">Página 1 de 1</span>
+          <button class="pagination-btn" onclick="nextTrackingPage()" id="nextTrackingPage">Siguiente</button>
+        </div>
+      </section>
+
       <section class="summary-strip">
         <article class="panel-card">
           <p class="eyebrow">En revision</p>
@@ -69,32 +180,13 @@
         </article>
       </section>
 
-      <section class="board-grid">
+      <section class="board-grid" id="trackingBoard">
         <article class="board-column">
           <div class="board-column-header">
             <h3>En revision</h3>
             <p>Requieren validar bases o coincidencia.</p>
           </div>
-          <div class="board-card">
-            <div class="board-card-head">
-              <div>
-                <h4>LP-2026-014</h4>
-                <p>Midis</p>
-              </div>
-              <span class="status active">Alta</span>
-            </div>
-            <p>Validar experiencia especifica y alcance del soporte requerido.</p>
-          </div>
-          <div class="board-card">
-            <div class="board-card-head">
-              <div>
-                <h4>AS-2026-087</h4>
-                <p>Gore Arequipa</p>
-              </div>
-              <span class="status review">Media</span>
-            </div>
-            <p>Revision de bases y matriz de cumplimiento tecnico.</p>
-          </div>
+          <div class="board-column-content" id="tracking-review"></div>
         </article>
 
         <article class="board-column">
@@ -102,26 +194,7 @@
             <h3>Preparando propuesta</h3>
             <p>Documentos y coordinacion interna.</p>
           </div>
-          <div class="board-card">
-            <div class="board-card-head">
-              <div>
-                <h4>AMC-2026-041</h4>
-                <p>Sunat</p>
-              </div>
-              <span class="status active">Alta</span>
-            </div>
-            <p>Se esta armando la oferta tecnica y el cronograma de entregables.</p>
-          </div>
-          <div class="board-card">
-            <div class="board-card-head">
-              <div>
-                <h4>CP-2026-115</h4>
-                <p>EsSalud</p>
-              </div>
-              <span class="status review">Media</span>
-            </div>
-            <p>Falta consolidar anexos y validar propuesta economica.</p>
-          </div>
+          <div class="board-column-content" id="tracking-preparing"></div>
         </article>
 
         <article class="board-column">
@@ -129,26 +202,7 @@
             <h3>Postulados</h3>
             <p>Esperando adjudicacion o respuesta.</p>
           </div>
-          <div class="board-card">
-            <div class="board-card-head">
-              <div>
-                <h4>CP-2026-102</h4>
-                <p>Reniec</p>
-              </div>
-              <span class="status done">Enviado</span>
-            </div>
-            <p>Oferta presentada. Se espera siguiente evento en cronograma oficial.</p>
-          </div>
-          <div class="board-card">
-            <div class="board-card-head">
-              <div>
-                <h4>LP-2026-008</h4>
-                <p>Sunarp</p>
-              </div>
-              <span class="status done">Enviado</span>
-            </div>
-            <p>Seguimiento de observaciones y publicacion de resultados.</p>
-          </div>
+          <div class="board-column-content" id="tracking-submitted"></div>
         </article>
       </section>
 
