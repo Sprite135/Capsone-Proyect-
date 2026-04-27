@@ -1,6 +1,9 @@
 using Microsoft.Playwright;
 using HtmlAgilityPack;
 using System.Linq;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("LicitIA.Tests")]
 
 namespace LicitIA.Api.Services;
 
@@ -419,6 +422,9 @@ public class SeaceScraperService
         return null;
     }
 
+    // Test helper for unit tests
+    internal DateTime? TestParseSeaceDate(string dateStr) => ParseSeaceDate(dateStr);
+
     private decimal ParseSeaceAmount(string amountStr)
     {
         if (string.IsNullOrWhiteSpace(amountStr))
@@ -434,6 +440,9 @@ public class SeaceScraperService
 
         return 0;
     }
+
+    // Test helper for unit tests
+    internal decimal TestParseSeaceAmount(string amountStr) => ParseSeaceAmount(amountStr);
 
     private string ExtractProcessCode(string title)
     {
