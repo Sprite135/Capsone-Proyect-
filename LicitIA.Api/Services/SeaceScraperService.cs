@@ -20,21 +20,13 @@ public class SeaceScraperService
         {
             Console.WriteLine("[SeaceScraper] Iniciando scraping con Playwright...");
 
-            // Intentar scraping con Playwright primero
+            // Usar Playwright para scraping de SEACE
             var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken);
 
             if (opportunities.Count > 0)
             {
                 Console.WriteLine($"[SeaceScraper] Se obtuvieron {opportunities.Count} oportunidades de SEACE");
                 return opportunities;
-            }
-
-            // Si falla, intentar acceso directo a API de SEACE
-            var apiOpportunities = await ScrapeFromSeaceApi(cancellationToken);
-            if (apiOpportunities.Count > 0)
-            {
-                Console.WriteLine($"[SeaceScraper] Se obtuvieron {apiOpportunities.Count} oportunidades de API de SEACE");
-                return apiOpportunities;
             }
 
             // Si falla, usar datos de ejemplo
@@ -47,139 +39,6 @@ public class SeaceScraperService
             Console.WriteLine("[SeaceScraper] Usando datos de ejemplo como fallback");
             return GetExampleOpportunities();
         }
-    }
-
-    private async Task<List<ScrapedOpportunity>> ScrapeFromSeaceApi(CancellationToken cancellationToken)
-    {
-        var opportunities = new List<ScrapedOpportunity>();
-        
-        try
-        {
-            Console.WriteLine("[SeaceScraper] Intentando acceso directo a API de SEACE...");
-            
-            // Intentar diferentes endpoints de la API de SEACE
-            var endpoints = new[]
-            {
-                "https://prod4.seace.gob.pe:8086/api/oportunidades",
-                "https://prod4.seace.gob.pe:8086/api/oportunidades/buscar",
-                "https://prod4.seace.gob.pe:8086/api/oportunidades/listar",
-                "https://prod4.seace.gob.pe:8086/api/procesos"
-            };
-            
-            foreach (var endpoint in endpoints)
-            {
-                try
-                {
-                    Console.WriteLine($"[SeaceScraper] Intentando endpoint: {endpoint}");
-                    var response = await _httpClient.GetAsync(endpoint, cancellationToken);
-                    
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var content = await response.Content.ReadAsStringAsync();
-                        Console.WriteLine($"[SeaceScraper] API response de {endpoint}: {content.Length} caracteres");
-                        
-                        if (content.Length > 100)
-                        {
-                            Console.WriteLine($"[SeaceScraper] Contenido: {content.Substring(0, Math.Min(200, content.Length))}...");
-                            
-                            // Intentar parsear la respuesta
-                            try
-                            {
-                                var data = System.Text.Json.JsonDocument.Parse(content);
-                                Console.WriteLine($"[SeaceScraper] JSON válido - analizando estructura...");
-                                
-                                // Intentar extraer datos del JSON
-                                opportunities = ExtractOpportunitiesFromJson(data);
-                                if (opportunities.Count > 0)
-                                {
-                                    Console.WriteLine($"[SeaceScraper] Se extrajeron {opportunities.Count} oportunidades del JSON");
-                                    return opportunities;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[SeaceScraper] Error al parsear JSON: {ex.Message}");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[SeaceScraper] {endpoint} falló: {response.StatusCode}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[SeaceScraper] Error al acceder a {endpoint}: {ex.Message}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SeaceScraper] Error general al acceder a API de SEACE: {ex.Message}");
-        }
-        
-        return opportunities;
-    }
-
-    private List<ScrapedOpportunity> ExtractOpportunitiesFromJson(System.Text.Json.JsonDocument data)
-    {
-        var opportunities = new List<ScrapedOpportunity>();
-        
-        try
-        {
-            // Intentar encontrar arrays en el JSON que puedan contener oportunidades
-            var root = data.RootElement;
-            
-            // Buscar propiedades que puedan ser arrays de oportunidades
-            foreach (var property in root.EnumerateObject())
-            {
-                if (property.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    Console.WriteLine($"[SeaceScraper] Encontrado array: {property.Name} con {property.Value.GetArrayLength()} elementos");
-                    
-                    // Intentar extraer datos del array
-                    foreach (var item in property.Value.EnumerateArray())
-                    {
-                        try
-                        {
-                            var opportunity = new ScrapedOpportunity();
-                            
-                            // Intentar extraer campos comunes
-                            if (item.TryGetProperty("numProceso", out var numProceso))
-                                opportunity.ProcessCode = numProceso.GetString() ?? "";
-                            if (item.TryGetProperty("nomenclatura", out var nomenclatura))
-                                opportunity.Title = nomenclatura.GetString() ?? "";
-                            if (item.TryGetProperty("detEntidad", out var detEntidad))
-                                opportunity.EntityName = detEntidad.GetString() ?? "";
-                            if (item.TryGetProperty("valorReferencial", out var valorReferencial))
-                                opportunity.EstimatedAmount = valorReferencial.GetDecimal();
-                            if (item.TryGetProperty("fechaConvocatoria", out var fechaConvocatoria) && fechaConvocatoria.TryGetDateTime(out var fecha))
-                                opportunity.ClosingDate = fecha;
-                            if (item.TryGetProperty("detObjeto", out var detObjeto))
-                                opportunity.Category = detObjeto.GetString() ?? "";
-                            if (item.TryGetProperty("detModalidadSeleccion", out var detModalidad))
-                                opportunity.Modality = detModalidad.GetString() ?? "";
-                            
-                            // Si tiene al menos un campo, agregarlo
-                            if (!string.IsNullOrEmpty(opportunity.ProcessCode) || !string.IsNullOrEmpty(opportunity.Title))
-                            {
-                                opportunities.Add(opportunity);
-                            }
-                        }
-                        catch
-                        {
-                            // Error al extraer datos de un item, continuar
-                        }
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SeaceScraper] Error al extraer oportunidades del JSON: {ex.Message}");
-        }
-        
-        return opportunities;
     }
 
     private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken)
@@ -591,137 +450,6 @@ public class SeaceScraperService
         return "";
     }
 
-    private List<ScrapedOpportunity> ParseApiResponses(List<string> apiResponses)
-    {
-        var opportunities = new List<ScrapedOpportunity>();
-        
-        foreach (var response in apiResponses)
-        {
-            try
-            {
-                Console.WriteLine($"[SeaceScraper] Analizando respuesta de API ({response.Length} caracteres)...");
-                
-                // Buscar palabras clave en la respuesta
-                if (response.Contains("proceso") || response.Contains("licitacion") || response.Contains("entidad") || response.Contains("monto"))
-                {
-                    Console.WriteLine($"[SeaceScraper] Respuesta potencial con datos de licitaciones");
-                    
-                    // Intentar parsear como JSON
-                    try
-                    {
-                        var data = System.Text.Json.JsonDocument.Parse(response);
-                        Console.WriteLine($"[SeaceScraper] JSON válido parseado - analizando estructura...");
-                        
-                        // Aquí podríamos extraer datos según la estructura del JSON
-                        // Por ahora, solo logueamos que encontramos un JSON válido
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[SeaceScraper] Error al parsear JSON: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SeaceScraper] Error al analizar respuesta: {ex.Message}");
-            }
-        }
-        
-        Console.WriteLine("[SeaceScraper] Parseo de respuestas de API completado - no se extrajeron datos reales");
-        return opportunities;
-    }
-
-    private List<ScrapedOpportunity> ParseSeaceHtml(string html)
-    {
-        var opportunities = new List<ScrapedOpportunity>();
-        
-        // Si el HTML está vacío o es muy corto, usar datos de ejemplo
-        if (string.IsNullOrEmpty(html) || html.Length < 1000)
-        {
-            Console.WriteLine("[SeaceScraper] HTML vacío o muy corto, usando datos de ejemplo");
-            return GetExampleOpportunities();
-        }
-        
-        try
-        {
-            Console.WriteLine("[SeaceScraper] Intentando parsear HTML real...");
-            var doc = new HtmlDocument();
-            doc.LoadHtml(html);
-            
-            // Intentar buscar elementos que contengan datos de oportunidades
-            // Esto es un parseo básico - puede requerir ajustes según la estructura real del sitio
-            
-            // Buscar tablas con datos
-            var tables = doc.DocumentNode.SelectNodes("//table");
-            if (tables != null && tables.Count > 0)
-            {
-                Console.WriteLine($"[SeaceScraper] Se encontraron {tables.Count} tablas");
-                // Intentar parsear datos de la tabla
-                // Por ahora, esto es un placeholder
-            }
-            
-            // Buscar elementos con clases típicas de datos
-            var dataElements = doc.DocumentNode.SelectNodes("//*[contains(@class, 'data') or contains(@class, 'opportunity') or contains(@class, 'licitacion')]");
-            if (dataElements != null && dataElements.Count > 0)
-            {
-                Console.WriteLine($"[SeaceScraper] Se encontraron {dataElements.Count} elementos con clases de datos");
-                // Intentar parsear datos de estos elementos
-            }
-            
-            // Buscar datos en formato JSON en el HTML
-            var jsonMatches = System.Text.RegularExpressions.Regex.Matches(html, @"\{[^{}]*\}");
-            if (jsonMatches.Count > 0)
-            {
-                Console.WriteLine($"[SeaceScraper] Se encontraron {jsonMatches.Count} posibles JSON objects");
-                
-                // Intentar parsear JSON objects para buscar datos de oportunidades
-                foreach (System.Text.RegularExpressions.Match match in jsonMatches)
-                {
-                    try
-                    {
-                        var json = match.Value;
-                        // Buscar palabras clave en el JSON
-                        if (json.Contains("proceso") || json.Contains("licitacion") || json.Contains("entidad") || json.Contains("monto"))
-                        {
-                            Console.WriteLine($"[SeaceScraper] JSON potencial con datos: {json.Substring(0, Math.Min(100, json.Length))}...");
-                            
-                            // Intentar parsear el JSON
-                            try
-                            {
-                                var data = System.Text.Json.JsonDocument.Parse(json);
-                                // Aquí podríamos extraer datos si el JSON tiene la estructura correcta
-                            }
-                            catch
-                            {
-                                // JSON inválido, continuar
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Error al procesar match, continuar
-                    }
-                }
-            }
-            
-            // Si no se encontraron datos estructurados, intentar buscar texto específico
-            if (html.Contains("proceso") || html.Contains("licitación") || html.Contains("convocatoria"))
-            {
-                Console.WriteLine("[SeaceScraper] HTML contiene palabras clave de licitaciones");
-                // Intentar extraer datos basados en patrones de texto
-            }
-            
-            Console.WriteLine("[SeaceScraper] Parseo básico completado - no se extrajeron datos reales");
-            Console.WriteLine("[SeaceScraper] El sitio es una SPA Angular - requiere análisis más profundo");
-            return GetExampleOpportunities();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SeaceScraper] Error al parsear HTML: {ex.Message}");
-            return GetExampleOpportunities();
-        }
-    }
-
     private List<ScrapedOpportunity> GetExampleOpportunities()
     {
         // Datos de ejemplo eliminados - ahora usamos datos reales de OECE
@@ -730,4 +458,3 @@ public class SeaceScraperService
         return new List<ScrapedOpportunity>();
     }
 }
-
