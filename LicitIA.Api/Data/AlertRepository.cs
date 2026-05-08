@@ -22,7 +22,7 @@ public class AlertRepository
         await connection.OpenAsync(cancellationToken);
 
         const string sql = @"
-            SELECT RuleId, UserId, Name, Trigger, ConditionsJson, ChannelsJson, 
+            SELECT RuleId, UserId, Name, TriggerType, ConditionsJson, ChannelsJson, 
                    RecipientsJson, MessageTemplate, IsActive, CreatedAtUtc, 
                    LastTriggeredAtUtc, TriggerCount
             FROM dbo.AlertRule
@@ -48,7 +48,7 @@ public class AlertRepository
         await connection.OpenAsync(cancellationToken);
 
         const string sql = @"
-            SELECT RuleId, UserId, Name, Trigger, ConditionsJson, ChannelsJson, 
+            SELECT RuleId, UserId, Name, TriggerType, ConditionsJson, ChannelsJson, 
                    RecipientsJson, MessageTemplate, IsActive, CreatedAtUtc, 
                    LastTriggeredAtUtc, TriggerCount
             FROM dbo.AlertRule
@@ -72,18 +72,18 @@ public class AlertRepository
         await connection.OpenAsync(cancellationToken);
 
         const string sql = @"
-            INSERT INTO dbo.AlertRule (UserId, Name, Trigger, ConditionsJson, ChannelsJson, 
+            INSERT INTO dbo.AlertRule (UserId, Name, TriggerType, ConditionsJson, ChannelsJson, 
                                        RecipientsJson, MessageTemplate, IsActive, CreatedAtUtc, 
                                        LastTriggeredAtUtc, TriggerCount)
             OUTPUT INSERTED.RuleId
-            VALUES (@UserId, @Name, @Trigger, @ConditionsJson, @ChannelsJson, 
+            VALUES (@UserId, @Name, @TriggerType, @ConditionsJson, @ChannelsJson, 
                     @RecipientsJson, @MessageTemplate, @IsActive, @CreatedAtUtc, 
                     @LastTriggeredAtUtc, @TriggerCount);";
 
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@UserId", rule.UserId);
         command.Parameters.AddWithValue("@Name", rule.Name);
-        command.Parameters.AddWithValue("@Trigger", rule.Trigger);
+        command.Parameters.AddWithValue("@TriggerType", rule.TriggerType);
         command.Parameters.AddWithValue("@ConditionsJson", rule.ConditionsJson);
         command.Parameters.AddWithValue("@ChannelsJson", rule.ChannelsJson);
         command.Parameters.AddWithValue("@RecipientsJson", rule.RecipientsJson);
@@ -105,7 +105,7 @@ public class AlertRepository
         const string sql = @"
             UPDATE dbo.AlertRule
             SET Name = @Name, 
-                Trigger = @Trigger, 
+                TriggerType = @TriggerType, 
                 ConditionsJson = @ConditionsJson, 
                 ChannelsJson = @ChannelsJson, 
                 RecipientsJson = @RecipientsJson, 
@@ -118,7 +118,7 @@ public class AlertRepository
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@RuleId", rule.RuleId);
         command.Parameters.AddWithValue("@Name", rule.Name);
-        command.Parameters.AddWithValue("@Trigger", rule.Trigger);
+        command.Parameters.AddWithValue("@TriggerType", rule.TriggerType);
         command.Parameters.AddWithValue("@ConditionsJson", rule.ConditionsJson);
         command.Parameters.AddWithValue("@ChannelsJson", rule.ChannelsJson);
         command.Parameters.AddWithValue("@RecipientsJson", rule.RecipientsJson);
@@ -178,6 +178,23 @@ public class AlertRepository
         return result != null ? Convert.ToInt32(result) : 0;
     }
 
+    public async Task<int> UpdateLastTriggeredAsync(int ruleId, CancellationToken cancellationToken)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string sql = @"
+            UPDATE dbo.AlertRule
+            SET LastTriggeredAtUtc = GETUTCDATE(),
+                TriggerCount = TriggerCount + 1
+            WHERE RuleId = @RuleId;";
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@RuleId", ruleId);
+
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static AlertRule MapAlertRule(SqlDataReader reader)
     {
         return new AlertRule
@@ -185,7 +202,7 @@ public class AlertRepository
             RuleId = reader.GetInt32(reader.GetOrdinal("RuleId")),
             UserId = reader.GetGuid(reader.GetOrdinal("UserId")),
             Name = reader.GetString(reader.GetOrdinal("Name")),
-            Trigger = reader.GetString(reader.GetOrdinal("Trigger")),
+            TriggerType = reader.GetString(reader.GetOrdinal("TriggerType")),
             ConditionsJson = reader.GetString(reader.GetOrdinal("ConditionsJson")),
             ChannelsJson = reader.GetString(reader.GetOrdinal("ChannelsJson")),
             RecipientsJson = reader.GetString(reader.GetOrdinal("RecipientsJson")),

@@ -105,7 +105,51 @@ public class AlertService
 </body>
 </html>";
 
-        await _emailService.SendEmailAsync(toEmail, subject, body, cancellationToken);
+        await _emailService.SendEmailAsync(toEmail, subject, body, true, cancellationToken);
+    }
+
+    public async Task<List<AlertRule>> GetRulesByUserIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await _alertRepository.GetByUserIdAsync(userId, cancellationToken);
+    }
+
+    public async Task SendAlertEmailAsync(string toEmail, string subject, string message, CancellationToken cancellationToken)
+    {
+        var body = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #3b82f6, #1cc8b7); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+        .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; }}
+        .footer {{ text-align: center; margin-top: 20px; color: #64748b; font-size: 12px; }}
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>📢 Alerta Activada</h1>
+        </div>
+        <div class='content'>
+            <h2>{subject}</h2>
+            <p>{message}</p>
+            <p><em>Esta es una notificación automática de LicitIA.</em></p>
+        </div>
+        <div class='footer'>
+            <p>LicitIA - Sistema de Inteligencia de Licitaciones</p>
+        </div>
+    </div>
+</body>
+</html>";
+
+        await _emailService.SendEmailAsync(toEmail, subject, body, true, cancellationToken);
+    }
+
+    public async Task UpdateRuleLastTriggeredAsync(int ruleId, CancellationToken cancellationToken)
+    {
+        await _alertRepository.UpdateLastTriggeredAsync(ruleId, cancellationToken);
     }
 }
 

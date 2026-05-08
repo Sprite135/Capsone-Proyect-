@@ -70,6 +70,8 @@ builder.Services.AddSingleton<CsvImportService>();
 builder.Services.AddSingleton<AffinityService>();
 builder.Services.AddSingleton<AlertRepository>();
 builder.Services.AddSingleton<AlertService>();
+builder.Services.AddSingleton<AlertSchedulerService>();
+builder.Services.AddSingleton<NotificationRepository>();
 builder.Services.AddHttpClient<OeceDataService>();
 builder.Services.AddHttpClient<OeceApiService>();
 
@@ -151,6 +153,21 @@ if (!string.IsNullOrEmpty(frontendPath))
 }
 
 app.MapGet("/", () => Results.Redirect("home.html"));
+
+// Start Alert Scheduler in background
+var alertScheduler = app.Services.GetRequiredService<AlertSchedulerService>();
+_ = Task.Run(async () =>
+{
+    try
+    {
+        // Check for alerts every 1 hour
+        await alertScheduler.StartAsync(TimeSpan.FromHours(1));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[AlertScheduler] Fatal error: {ex.Message}");
+    }
+});
 
 app.MapGet("/api/health", () => Results.Ok(new
 {
@@ -1155,6 +1172,138 @@ app.MapPost("/api/alerts/send-test", async (
     {
         return Results.Problem(
             title: "Error al enviar correo de prueba",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+// Panel Notifications endpoints
+app.MapGet("/api/notifications", async (
+    NotificationRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var notifications = await repository.GetByUserIdAsync(userId.Value, cancellationToken);
+        return Results.Ok(notifications);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al obtener notificaciones",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapGet("/api/notifications/unread", async (
+    NotificationRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var notifications = await repository.GetUnreadByUserIdAsync(userId.Value, cancellationToken);
+        return Results.Ok(notifications);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al obtener notificaciones no leídas",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapGet("/api/notifications/unread-count", async (
+    NotificationRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var count = await repository.GetUnreadCountByUserIdAsync(userId.Value, cancellationToken);
+        return Results.Ok(new { count });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al obtener contador de notificaciones",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapPost("/api/notifications/{id}/read", async (
+    int id,
+    NotificationRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        await repository.MarkAsReadAsync(id, cancellationToken);
+        return Results.Ok(new { message = "Notificación marcada como leída." });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al marcar notificación como leída",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapPost("/api/notifications/mark-all-read", async (
+    NotificationRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var count = await repository.MarkAllAsReadByUserIdAsync(userId.Value, cancellationToken);
+        return Results.Ok(new { message = $"{count} notificaciones marcadas como leídas." });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al marcar todas las notificaciones como leídas",
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }

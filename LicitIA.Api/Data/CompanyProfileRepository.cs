@@ -66,6 +66,32 @@ public class CompanyProfileRepository
         return null;
     }
 
+    public async Task<List<Models.CompanyProfile>> GetAllProfilesAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string sql = @"
+            SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
+                   MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
+                   PreferredKeywords, ExcludedKeywords, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   CreatedAtUtc, UpdatedAtUtc
+            FROM dbo.CompanyProfile
+            WHERE UserId IS NOT NULL
+            ORDER BY CreatedAtUtc DESC;";
+
+        await using var command = new SqlCommand(sql, connection);
+
+        var profiles = new List<Models.CompanyProfile>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            profiles.Add(MapCompanyProfile(reader));
+        }
+
+        return profiles;
+    }
+
     public async Task<int> InsertProfileAsync(Models.CompanyProfile profile, CancellationToken cancellationToken)
     {
         await using var connection = _connectionFactory.CreateConnection();
