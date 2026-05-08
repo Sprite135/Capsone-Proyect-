@@ -68,6 +68,8 @@ builder.Services.AddSingleton<EmailService>();
 builder.Services.AddSingleton<SeaceScraperService>();
 builder.Services.AddSingleton<CsvImportService>();
 builder.Services.AddSingleton<AffinityService>();
+builder.Services.AddSingleton<AlertRepository>();
+builder.Services.AddSingleton<AlertService>();
 builder.Services.AddHttpClient<OeceDataService>();
 builder.Services.AddHttpClient<OeceApiService>();
 
@@ -943,6 +945,208 @@ app.MapPut("/api/profile/{id}", async (
     {
         return Results.Problem(
             title: "Error al actualizar perfil",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+// Alert endpoints
+app.MapGet("/api/alerts/summary", async (
+    AlertService alertService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var summary = await alertService.GetAlertSummaryAsync(userId.Value, cancellationToken);
+        return Results.Ok(summary);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al obtener resumen de alertas",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapGet("/api/alerts/rules", async (
+    AlertService alertService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var rules = await alertService.GetAlertRulesByUserIdAsync(userId.Value, cancellationToken);
+        return Results.Ok(rules);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al obtener reglas de alerta",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapPost("/api/alerts/rules", async (
+    AlertService alertService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    LicitIA.Api.Models.AlertRule requestRule,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var newRule = requestRule with
+        {
+            UserId = userId.Value,
+            CreatedAtUtc = DateTime.UtcNow,
+            TriggerCount = 0,
+            LastTriggeredAtUtc = null
+        };
+
+        var ruleId = await alertService.CreateAlertRuleAsync(newRule, cancellationToken);
+        var createdRule = newRule with { RuleId = ruleId };
+        return Results.Created($"/api/alerts/rules/{ruleId}", createdRule);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al crear regla de alerta",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapPut("/api/alerts/rules/{id}", async (
+    int id,
+    AlertService alertService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    LicitIA.Api.Models.AlertRule requestRule,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var existingRule = await alertService.GetAlertRuleByIdAsync(id, cancellationToken);
+        if (existingRule == null)
+        {
+            return Results.NotFound(new { message = "No se encontró la regla de alerta." });
+        }
+
+        if (existingRule.UserId != userId.Value)
+        {
+            return Results.Forbid();
+        }
+
+        var updatedRule = requestRule with
+        {
+            RuleId = id,
+            UserId = userId.Value
+        };
+
+        await alertService.UpdateAlertRuleAsync(updatedRule, cancellationToken);
+        return Results.Ok(updatedRule);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al actualizar regla de alerta",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapDelete("/api/alerts/rules/{id}", async (
+    int id,
+    AlertService alertService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var existingRule = await alertService.GetAlertRuleByIdAsync(id, cancellationToken);
+        if (existingRule == null)
+        {
+            return Results.NotFound(new { message = "No se encontró la regla de alerta." });
+        }
+
+        if (existingRule.UserId != userId.Value)
+        {
+            return Results.Forbid();
+        }
+
+        await alertService.DeleteAlertRuleAsync(id, cancellationToken);
+        return Results.Ok(new { message = "Regla de alerta eliminada exitosamente." });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al eliminar regla de alerta",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
+
+app.MapPost("/api/alerts/send-test", async (
+    AlertService alertService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Get user email from auth repository to send test email
+        // For now, use a placeholder
+        var userEmail = "user@example.com"; // TODO: Get from user context
+
+        await alertService.SendTestEmailAsync(userEmail, "Prueba de Alerta", cancellationToken);
+        return Results.Ok(new { message = "Correo de prueba enviado exitosamente." });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al enviar correo de prueba",
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
