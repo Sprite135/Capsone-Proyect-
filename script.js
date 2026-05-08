@@ -1,7 +1,9 @@
 const message = document.getElementById("message");
 const chips = document.querySelectorAll(".chip");
 const demoButtons = document.querySelectorAll("[data-demo-message]");
-const API_BASE = "http://localhost:5153";
+if (typeof API_BASE === 'undefined') {
+  var API_BASE = "http://localhost:5153";
+}
 const opportunitiesContainer = document.getElementById("opportunityResults");
 const opportunitySearch = document.getElementById("opportunitySearch");
 const opportunityMeta = document.getElementById("opportunityMeta");
@@ -28,6 +30,41 @@ const itemsPerPage = 15;
 let lastFilteredCount = 0;
 let profileKeywords = { preferred: [], excluded: [] };
 
+function handleOAuthRedirect() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+
+  if (!token) {
+    return;
+  }
+
+  try {
+    localStorage.setItem('authToken', token);
+    window.AUTH_TOKEN = token;
+  } catch (e) {
+    // ignore storage errors
+  }
+
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage({
+      type: 'licitia-google-auth',
+      token,
+      redirectUrl: 'index.html'
+    }, '*');
+    window.close();
+    return;
+  }
+
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+handleOAuthRedirect();
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("authToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const setMessage = (text) => {
   if (message) {
     message.textContent = text;
@@ -37,6 +74,13 @@ const setMessage = (text) => {
 demoButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setMessage(button.dataset.demoMessage);
+  });
+});
+
+document.querySelectorAll(".logout-button").forEach((button) => {
+  button.addEventListener("click", () => {
+    localStorage.removeItem("authToken");
+    window.AUTH_TOKEN = null;
   });
 });
 
@@ -260,17 +304,17 @@ function toggleFavorite(opportunityId) {
   
   if (index > -1) {
     favorites.splice(index, 1);
-    setMessage("Oportunidad eliminada de favoritos.");
+    setMessage("Oportunidad removida de siguiendo.");
   } else {
     favorites.push(opportunityId);
-    setMessage("Oportunidad agregada a favoritos.");
+    setMessage("Oportunidad agregada a siguiendo.");
   }
   
   localStorage.setItem('favoriteOpportunities', JSON.stringify(favorites));
   renderOpportunities();
 }
 
-// Event delegation for favorite buttons
+// Event delegation for following buttons
 document.addEventListener('click', (e) => {
   const favoriteBtn = e.target.closest('.favorite-btn');
   if (favoriteBtn) {
@@ -344,7 +388,7 @@ async function loadTrackingBoard() {
     const data = await response.json().catch(() => []);
     const allOpportunities = Array.isArray(data) ? data : [];
 
-    // Obtener oportunidades en favoritos (seguimiento)
+    // Obtener oportunidades en seguimiento
     const favoriteIds = JSON.parse(localStorage.getItem('favoriteOpportunities') || '[]');
     const favoriteOpportunities = allOpportunities.filter(op => favoriteIds.includes(op.opportunityId));
 
@@ -580,7 +624,9 @@ function renderTrackingColumn(containerId, opportunities) {
 
 async function loadProfile() {
   try {
-    const response = await fetch(`${API_BASE}/api/profile`);
+    const response = await fetch(`${API_BASE}/api/profile`, {
+      headers: getAuthHeaders()
+    });
     if (response.ok) {
       const profile = await response.json();
       profileKeywords.preferred = profile.preferredKeywords || [];
@@ -1129,7 +1175,7 @@ function createOpportunityMarkup(item, index) {
           <p>${escapeHtml(item.entityName)}</p>
         </div>
         <div class="result-header-actions">
-          <button class="favorite-btn ${favoriteClass}" data-opportunity-id="${item.opportunityId}" type="button" aria-label="Marcar como favorito">
+          <button class="favorite-btn ${favoriteClass}" data-opportunity-id="${item.opportunityId}" type="button" aria-label="Marcar como siguiendo">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
             </svg>

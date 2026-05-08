@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:5153';
+if (typeof API_BASE === 'undefined') {
+  var API_BASE = 'http://localhost:5153';
+}
 
 async function loadEntityAnalysis() {
     try {

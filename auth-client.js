@@ -1,4 +1,6 @@
-const API_BASE = "http://localhost:5153";
+if (typeof API_BASE === 'undefined') {
+  var API_BASE = "http://localhost:5153";
+}
 const authForm = document.querySelector("[data-auth-form]");
 const formStatus = document.getElementById("formStatus");
 const googleButtons = document.querySelectorAll(".google-button");

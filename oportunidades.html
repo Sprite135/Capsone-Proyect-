@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LicitIA | Oportunidades</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
@@ -44,8 +43,8 @@
           <h2>Oportunidades para filtrar, comparar y abrir el detalle de cada licitacion</h2>
         </div>
         <div class="topbar-actions">
+          <input class="search-box search-input" id="opportunitySearch" type="search" placeholder="Buscar procesos, entidades o rubros">
           <button class="secondary-button" type="button" id="saveFiltersBtn">Guardar filtros</button>
-          <button class="secondary-button" type="button" id="recalculateAffinity">Recalcular afinidad</button>
           <button class="primary-button" type="button" data-demo-message="Se sincronizo la lista con nuevas convocatorias del SEACE.">Sincronizar SEACE</button>
           <div class="account-actions">
             <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
@@ -145,17 +144,12 @@
             <div>
               <p class="eyebrow">Resultados</p>
               <h3>Bandeja priorizada</h3>
+              <p class="help-copy" id="opportunityMeta">Cargando oportunidades desde la API...</p>
             </div>
-          </div>
-
-          <div class="card-meta-row">
-            <p class="help-copy" id="opportunityMeta">Cargando oportunidades desde la API...</p>
-            <div class="header-actions">
-              <input class="search-box search-input" id="opportunitySearch" type="search" placeholder="Buscar procesos, entidades o rubros">
-              <div class="page-tabs">
-                <a class="active" href="oportunidades.html" data-tab="all">Todas</a>
-                <a href="oportunidades.html" data-tab="favorites">Siguiendo</a>
-              </div>
+            <div class="page-tabs">
+              <a class="active" href="oportunidades.html" data-tab="all">Recomendadas</a>
+              <a href="oportunidades.html" data-tab="recent">Recientes</a>
+              <a href="oportunidades.html" data-tab="favorites">Siguiendo</a>
             </div>
           </div>
 

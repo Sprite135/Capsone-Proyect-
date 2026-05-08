@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\LicitIA.Api.props" />
-</Project>

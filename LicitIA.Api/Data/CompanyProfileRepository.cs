@@ -103,7 +103,7 @@ public class CompanyProfileRepository
         return Convert.ToInt32(result);
     }
 
-    public async Task UpdateProfileAsync(Models.CompanyProfile profile, CancellationToken cancellationToken)
+    public async Task<int> UpdateProfileAsync(Models.CompanyProfile profile, Guid userId, CancellationToken cancellationToken)
     {
         await using var connection = _connectionFactory.CreateConnection();
         await connection.OpenAsync(cancellationToken);
@@ -125,10 +125,12 @@ public class CompanyProfileRepository
                 MaxDaysToClose = @MaxDaysToClose,
                 IdealDaysToClose = @IdealDaysToClose,
                 UpdatedAtUtc = GETUTCDATE()
-            WHERE ProfileId = @ProfileId;";
+            WHERE ProfileId = @ProfileId
+              AND UserId = @UserId;";
 
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@ProfileId", profile.ProfileId);
+        command.Parameters.AddWithValue("@UserId", userId);
         command.Parameters.AddWithValue("@CompanyName", profile.CompanyName);
         command.Parameters.AddWithValue("@PreferredCategories", JsonSerializer.Serialize(profile.PreferredCategories));
         command.Parameters.AddWithValue("@PreferredLocations", JsonSerializer.Serialize(profile.PreferredLocations));
@@ -144,7 +146,7 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
 
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static Models.CompanyProfile MapCompanyProfile(SqlDataReader reader)

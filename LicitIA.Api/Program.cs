@@ -15,7 +15,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using ScrapedOpportunity = LicitIA.Api.Services.ScrapedOpportunity;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -35,6 +34,28 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
+// Add JWT Authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
+        if (jwtOptions != null)
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtOptions.Issuer,
+                ValidAudience = jwtOptions.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
+            };
+        }
+    });
+
+builder.Services.AddAuthorization();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection("GoogleAuth"));
 builder.Services.AddHttpClient();
@@ -97,6 +118,8 @@ app.UseExceptionHandler(exceptionApp =>
 });
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Enable Swagger
 app.UseSwagger();
@@ -812,15 +835,23 @@ app.MapPost("/api/seace/refresh", async (
 // Company Profile endpoints
 app.MapGet("/api/profile", async (
     CompanyProfileRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        Console.WriteLine("[Profile] Loading profile...");
-        var profile = await repository.GetDefaultProfileAsync(cancellationToken);
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        Console.WriteLine($"[Profile] Loading profile for user {userId}...");
+        var profile = await repository.GetByUserIdAsync(userId.Value, cancellationToken);
         if (profile == null)
         {
-            Console.WriteLine("[Profile] No profile found");
+            Console.WriteLine($"[Profile] No profile found for user {userId}");
             return Results.NotFound(new { message = "No se encontró perfil de empresa." });
         }
         Console.WriteLine($"[Profile] Profile loaded: {profile.CompanyName}, Keywords: {profile.PreferredKeywords.Count}");
@@ -834,17 +865,40 @@ app.MapGet("/api/profile", async (
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/profile", async (
     CompanyProfileRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
     LicitIA.Api.Models.CompanyProfile requestProfile,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        var profileId = await repository.InsertProfileAsync(requestProfile, cancellationToken);
-        return Results.Created($"/api/profile/{profileId}", requestProfile);
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var existingProfile = await repository.GetByUserIdAsync(userId.Value, cancellationToken);
+        if (existingProfile is not null)
+        {
+            var updatedProfile = requestProfile with
+            {
+                ProfileId = existingProfile.ProfileId,
+                UserId = userId.Value
+            };
+
+            await repository.UpdateProfileAsync(updatedProfile, userId.Value, cancellationToken);
+            return Results.Ok(updatedProfile);
+        }
+
+        var newProfile = requestProfile with { UserId = userId.Value };
+        var profileId = await repository.InsertProfileAsync(newProfile, cancellationToken);
+        var createdProfile = newProfile with { ProfileId = profileId };
+        return Results.Created($"/api/profile/{profileId}", createdProfile);
     }
     catch (Exception ex)
     {
@@ -853,20 +907,36 @@ app.MapPost("/api/profile", async (
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
-});
+}).RequireAuthorization();
 
 app.MapPut("/api/profile/{id}", async (
     int id,
     CompanyProfileRepository repository,
-    AffinityService affinityService,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
     LicitIA.Api.Models.CompanyProfile requestProfile,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        var updatedProfile = requestProfile with { ProfileId = id };
-        await repository.UpdateProfileAsync(updatedProfile, cancellationToken);
-        affinityService.InvalidateCache();
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var updatedProfile = requestProfile with
+        {
+            ProfileId = id,
+            UserId = userId.Value
+        };
+
+        var affectedRows = await repository.UpdateProfileAsync(updatedProfile, userId.Value, cancellationToken);
+        if (affectedRows == 0)
+        {
+            return Results.NotFound(new { message = "No se encontro perfil de empresa para este usuario." });
+        }
+
         return Results.Ok(updatedProfile);
     }
     catch (Exception ex)
@@ -876,7 +946,7 @@ app.MapPut("/api/profile/{id}", async (
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
-});
+}).RequireAuthorization();
 
 // CSV Import endpoint - import data from manually downloaded SEACE CSV
 app.MapPost("/api/opportunities/import-csv", async (
@@ -913,60 +983,6 @@ app.MapPost("/api/opportunities/import-csv", async (
         Console.WriteLine($"[CsvImport] Error: {ex.Message}");
         return Results.Problem(
             title: "Error al importar CSV",
-            detail: ex.Message,
-            statusCode: StatusCodes.Status500InternalServerError);
-    }
-});
-
-// Recalculate affinity scores endpoint
-app.MapPost("/api/opportunities/recalculate-affinity", async (
-    OpportunityRepository repository,
-    AffinityService affinityService,
-    CancellationToken cancellationToken) =>
-{
-    try
-    {
-        Console.WriteLine("[RecalculateAffinity] Iniciando recálculo de afinidad...");
-
-        var opportunities = await repository.GetAllAsync(cancellationToken);
-        Console.WriteLine($"[RecalculateAffinity] {opportunities.Count} oportunidades encontradas");
-
-        int updatedCount = 0;
-        foreach (var opportunity in opportunities)
-        {
-            var scrapedOpportunity = new ScrapedOpportunity
-            {
-                ProcessCode = opportunity.ProcessCode,
-                Title = opportunity.Title,
-                Description = opportunity.Summary ?? ""
-            };
-
-            var newScore = await affinityService.CalculateAffinityScoreAsync(scrapedOpportunity, cancellationToken);
-            var newMatchedCount = scrapedOpportunity.MatchedKeywordsCount;
-
-            if (opportunity.MatchScore != newScore || opportunity.MatchedKeywordsCount != newMatchedCount)
-            {
-                await repository.UpdateMatchScoreAndCountAsync(opportunity.OpportunityId, newScore, newMatchedCount, cancellationToken);
-                updatedCount++;
-            }
-        }
-
-        affinityService.InvalidateCache();
-
-        Console.WriteLine($"[RecalculateAffinity] Recálculo completado. {updatedCount} oportunidades actualizadas");
-
-        return Results.Ok(new
-        {
-            message = $"Recálculo completado. {updatedCount} de {opportunities.Count} oportunidades actualizadas.",
-            totalOpportunities = opportunities.Count,
-            updatedCount
-        });
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[RecalculateAffinity] Error: {ex.Message}");
-        return Results.Problem(
-            title: "Error al recalcular afinidad",
             detail: ex.Message,
             statusCode: StatusCodes.Status500InternalServerError);
     }
@@ -1463,6 +1479,7 @@ static string GenerateJwtToken(AppUser user, JwtOptions options, bool rememberMe
     var claims = new List<Claim>
     {
         new(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+        new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
         new(JwtRegisteredClaimNames.Email, user.Email),
         new(JwtRegisteredClaimNames.UniqueName, user.FullName),
         new(ClaimTypes.Role, user.RoleName)
@@ -1529,6 +1546,51 @@ static bool ValidateJwtToken(string token, string expectedEmail, JwtOptions opti
     {
         Console.WriteLine($"[ValidateJwtToken] Exception: {ex.GetType().Name}: {ex.Message}");
         return false;
+    }
+}
+
+static Guid? GetAuthenticatedUserId(HttpContext httpContext, JwtOptions options)
+{
+    var authorization = httpContext.Request.Headers.Authorization.ToString();
+    if (string.IsNullOrWhiteSpace(authorization) ||
+        !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        return null;
+    }
+
+    var token = authorization["Bearer ".Length..].Trim();
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return null;
+    }
+
+    try
+    {
+        var secret = string.IsNullOrWhiteSpace(options.Key)
+            ? "CHANGE_ME_REPLACE_WITH_STRONG_SECRET_1234567890"
+            : options.Key;
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = string.IsNullOrWhiteSpace(options.Issuer) ? "LicitIA" : options.Issuer,
+            ValidAudience = string.IsNullOrWhiteSpace(options.Audience) ? "LicitIAUsers" : options.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret))
+        }, out _);
+
+        var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+            ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Auth] Invalid bearer token: {ex.GetType().Name}: {ex.Message}");
+        return null;
     }
 }
 

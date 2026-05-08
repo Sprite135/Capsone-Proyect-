@@ -1,8 +1,17 @@
-const API_BASE = 'http://localhost:5153/api';
+const CONFIG_API_BASE = 'http://localhost:5153/api';
 
 let currentProfile = null;
 let preferredKeywords = [];
 let excludedKeywords = [];
+
+function getAuthHeaders(includeJson = false) {
+  const headers = includeJson ? { 'Content-Type': 'application/json' } : {};
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 // Load profile on page load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -12,10 +21,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadProfile() {
   try {
-    const response = await fetch(`${API_BASE}/profile`);
+    const response = await fetch(`${CONFIG_API_BASE}/profile`, {
+      headers: getAuthHeaders()
+    });
     if (response.ok) {
       currentProfile = await response.json();
       populateForm(currentProfile);
+    } else if (response.status === 401) {
+      showMessage('Inicia sesion para cargar tu configuracion.', 'error');
     } else if (response.status === 404) {
       showMessage('No se encontró perfil. Crea uno nuevo.', 'info');
     } else {
@@ -42,6 +55,14 @@ function setupEventListeners() {
   safeAddListener('saveProfile', 'click', saveProfile);
   safeAddListener('resetProfile', 'click', resetForm);
   safeAddListener('recalculateAffinity', 'click', recalculateAffinity);
+
+  const logoutButton = document.querySelector('.logout-button');
+  if (logoutButton) {
+    logoutButton.addEventListener('click', () => {
+      localStorage.removeItem('authToken');
+      window.AUTH_TOKEN = null;
+    });
+  }
   
   // Keyword management
   safeAddListener('addPreferredKeyword', 'click', () => addKeyword('preferred'));
@@ -115,16 +136,16 @@ async function saveProfile() {
     let response;
     if (currentProfile && currentProfile.profileId) {
       // Update existing profile
-      response = await fetch(`${API_BASE}/profile/${currentProfile.profileId}`, {
+      response = await fetch(`${CONFIG_API_BASE}/profile/${currentProfile.profileId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(true),
         body: JSON.stringify(profileData)
       });
     } else {
       // Create new profile
-      response = await fetch(`${API_BASE}/profile`, {
+      response = await fetch(`${CONFIG_API_BASE}/profile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(true),
         body: JSON.stringify(profileData)
       });
     }
@@ -137,6 +158,8 @@ async function saveProfile() {
       renderKeywords();
       
       showMessage('Perfil guardado exitosamente', 'success');
+    } else if (response.status === 401) {
+      showMessage('Inicia sesion para guardar tu configuracion.', 'error');
     } else {
       const errorText = await response.text();
       console.error('Error response:', errorText);
@@ -182,14 +205,15 @@ function resetForm() {
 async function recalculateAffinity() {
   try {
     showMessage('Recalculando afinidad...', 'info');
-
-    const response = await fetch(`${API_BASE}/opportunities/recalculate-affinity`, {
-      method: 'POST'
+    
+    const response = await fetch(`${CONFIG_API_BASE}/opportunities/analyze`, {
+      method: 'POST',
+      headers: getAuthHeaders()
     });
 
     if (response.ok) {
       const result = await response.json();
-      showMessage(`Afinidad recalculada: ${result.updatedCount} de ${result.totalOpportunities} oportunidades actualizadas`, 'success');
+      showMessage(`Afinidad recalculada: ${result.updatedCount} oportunidades actualizadas`, 'success');
     } else {
       showMessage('Error al recalcular afinidad', 'error');
     }
