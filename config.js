@@ -41,9 +41,18 @@ async function loadProfile() {
 }
 
 function populateForm(profile) {
+  // Populate company name
+  const companyNameInput = document.getElementById('companyName');
+  if (companyNameInput) {
+    companyNameInput.value = profile.companyName || '';
+  }
+  
+  // Populate keywords
   preferredKeywords = profile.preferredKeywords || [];
   excludedKeywords = profile.excludedKeywords || [];
   renderKeywords();
+  
+  // Other fields would be populated here if they existed in the HTML
 }
 
 function setupEventListeners() {
@@ -172,8 +181,11 @@ async function saveProfile() {
 }
 
 function getFormData() {
+  const companyNameInput = document.getElementById('companyName');
+  const companyName = companyNameInput ? companyNameInput.value.trim() : 'Default';
+  
   return {
-    companyName: (currentProfile && currentProfile.companyName) || 'Default',
+    companyName: companyName || 'Default',
     preferredCategories: currentProfile?.preferredCategories || [],
     preferredLocations: currentProfile?.preferredLocations || [],
     preferredModalities: currentProfile?.preferredModalities || [],

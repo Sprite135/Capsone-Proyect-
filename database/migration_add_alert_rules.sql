@@ -8,7 +8,7 @@ BEGIN
         RuleId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         UserId UNIQUEIDENTIFIER NOT NULL,
         Name NVARCHAR(200) NOT NULL,
-        Trigger NVARCHAR(50) NOT NULL, -- "alta_afinidad", "nueva_oportunidad", "cierre_proximo"
+        TriggerType NVARCHAR(50) NOT NULL, -- "alta_afinidad", "nueva_oportunidad", "cierre_proximo"
         ConditionsJson NVARCHAR(MAX) NULL, -- JSON con condiciones
         ChannelsJson NVARCHAR(MAX) NULL, -- JSON con canales: ["email", "panel", "slack"]
         RecipientsJson NVARCHAR(MAX) NULL, -- JSON con emails

@@ -22,7 +22,7 @@ const detailModality = document.getElementById("detailModality");
 const detailStatus = document.getElementById("detailStatus");
 const detailLocation = document.getElementById("detailLocation");
 const detailUrgency = document.getElementById("detailUrgency");
-const syncSeaceButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Sincronizar SEACE'));
+const syncSeaceButton = document.getElementById('syncSeaceButton');
 
 let allOpportunities = [];
 let currentPage = 1;
@@ -85,46 +85,62 @@ document.querySelectorAll(".logout-button").forEach((button) => {
 });
 
 // Conectar botón Sincronizar SEACE al endpoint de refresh
+console.log("Buscando botón syncSeaceButton...", syncSeaceButton);
 if (syncSeaceButton) {
+  console.log("Botón encontrado, agregando event listener");
   syncSeaceButton.addEventListener("click", async () => {
+    console.log("Click en botón Sincronizar SEACE");
     try {
       syncSeaceButton.disabled = true;
       syncSeaceButton.textContent = "Sincronizando...";
       setMessage("Iniciando sincronización con SEACE...");
 
-      const token = localStorage.getItem('jwtToken');
-      const headers = {
-        'Content-Type': 'application/json'
-      };
+      const token = localStorage.getItem('jwtToken') || localStorage.getItem('authToken');
+      console.log("Token encontrado:", !!token);
+      console.log("Tokens en localStorage:", {
+        jwtToken: !!localStorage.getItem('jwtToken'),
+        authToken: !!localStorage.getItem('authToken')
+      });
       
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (!token) {
+        throw new Error("No estás autenticado. Inicia sesión primero.");
       }
 
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      console.log("Enviando request a:", `${API_BASE}/api/seace/refresh`);
       const response = await fetch(`${API_BASE}/api/seace/refresh`, {
         method: 'POST',
         headers: headers
       });
 
+      console.log("Response status:", response.status);
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error("Debes iniciar sesión para sincronizar con SEACE");
+          throw new Error("Sesión expirada. Inicia sesión nuevamente.");
         }
-        throw new Error("Error al sincronizar con SEACE");
+        throw new Error(`Error al sincronizar con SEACE: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log("Response data:", data);
       setMessage(data.message || "Sincronización completada exitosamente");
       
       // Recargar oportunidades
       await loadOpportunities();
     } catch (error) {
+      console.error("Error en sincronización:", error);
       setMessage("Error al sincronizar con SEACE: " + error.message);
     } finally {
       syncSeaceButton.disabled = false;
       syncSeaceButton.textContent = "Sincronizar SEACE";
     }
   });
+} else {
+  console.log("Botón syncSeaceButton NO encontrado");
 }
 
 chips.forEach((chip) => {

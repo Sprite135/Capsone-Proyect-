@@ -1,6 +1,6 @@
 namespace LicitIA.Api.Models;
 
-public sealed class AlertRule
+public record AlertRule
 {
     public int RuleId { get; init; }
     
@@ -8,7 +8,7 @@ public sealed class AlertRule
     
     public string Name { get; init; } = string.Empty;
     
-    public string Trigger { get; init; } = string.Empty; // "alta_afinidad", "nueva_oportunidad", "cierre_proximo"
+    public string TriggerType { get; init; } = string.Empty; // "alta_afinidad", "nueva_oportunidad", "cierre_proximo"
     
     public string ConditionsJson { get; init; } = string.Empty; // JSON con condiciones
     
