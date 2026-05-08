@@ -92,11 +92,24 @@ if (syncSeaceButton) {
       syncSeaceButton.textContent = "Sincronizando...";
       setMessage("Iniciando sincronización con SEACE...");
 
+      const token = localStorage.getItem('jwtToken');
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/api/seace/refresh`, {
-        method: 'POST'
+        method: 'POST',
+        headers: headers
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Debes iniciar sesión para sincronizar con SEACE");
+        }
         throw new Error("Error al sincronizar con SEACE");
       }
 
