@@ -763,12 +763,20 @@ app.MapPost("/api/seace/refresh", async (
     SeaceScraperService seaceScraperService,
     AffinityService affinityService,
     OpportunityRepository repository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
     CancellationToken cancellationToken,
     [FromQuery] int maxResults = 30) =>
 {
     try
     {
-        Console.WriteLine($"[SeaceScraper] Iniciando refresh de SEACE - limpiando BD y descargando {maxResults} oportunidades...");
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+
+        Console.WriteLine($"[SeaceScraper] Iniciando refresh de SEACE para usuario {userId} - limpiando BD y descargando {maxResults} oportunidades...");
 
         // Limpiar todas las oportunidades existentes
         await repository.ClearAllOpportunitiesAsync(cancellationToken);
@@ -782,8 +790,8 @@ app.MapPost("/api/seace/refresh", async (
             return Results.Ok(new { message = "No se encontraron oportunidades en SEACE.", count = 0 });
         }
 
-        // Calcular afinidad antes de guardar
-        var rankedOpportunities = await affinityService.RankOpportunitiesAsync(seaceOpportunities, cancellationToken);
+        // Calcular afinidad antes de guardar usando perfil del usuario
+        var rankedOpportunities = await affinityService.RankOpportunitiesAsync(seaceOpportunities, userId.Value, cancellationToken);
 
         // Guardar las oportunidades con scores de afinidad
         int savedCount = 0;

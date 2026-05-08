@@ -17,7 +17,28 @@ namespace LicitIA.Api.Services
             _profileRepository = profileRepository;
         }
 
-        private async Task<Models.CompanyProfile> GetProfileAsync(CancellationToken cancellationToken)
+        private async Task<Models.CompanyProfile> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            var profile = await _profileRepository.GetByUserIdAsync(userId, cancellationToken);
+            if (profile == null)
+            {
+                profile = await _profileRepository.GetDefaultProfileAsync(cancellationToken);
+            }
+            
+            if (profile == null)
+            {
+                profile = new Models.CompanyProfile
+                {
+                    CompanyName = "Default",
+                    PreferredKeywords = new List<string>(),
+                    ExcludedKeywords = new List<string>()
+                };
+            }
+
+            return profile;
+        }
+
+        private async Task<Models.CompanyProfile> GetDefaultProfileAsync(CancellationToken cancellationToken)
         {
             if (_cachedProfile != null)
             {
@@ -39,9 +60,15 @@ namespace LicitIA.Api.Services
             return profile;
         }
 
+        public async Task<int> CalculateAffinityScoreAsync(ScrapedOpportunity opportunity, Guid userId, CancellationToken cancellationToken)
+        {
+            var profile = await GetProfileAsync(userId, cancellationToken);
+            return CalculateAffinityScore(opportunity, profile);
+        }
+
         public async Task<int> CalculateAffinityScoreAsync(ScrapedOpportunity opportunity, CancellationToken cancellationToken)
         {
-            var profile = await GetProfileAsync(cancellationToken);
+            var profile = await GetDefaultProfileAsync(cancellationToken);
             return CalculateAffinityScore(opportunity, profile);
         }
 
@@ -123,9 +150,21 @@ namespace LicitIA.Api.Services
             };
         }
 
+        public async Task<List<ScrapedOpportunity>> RankOpportunitiesAsync(List<ScrapedOpportunity> opportunities, Guid userId, CancellationToken cancellationToken)
+        {
+            var profile = await GetProfileAsync(userId, cancellationToken);
+
+            foreach (var opportunity in opportunities)
+            {
+                opportunity.MatchScore = CalculateAffinityScore(opportunity, profile);
+            }
+
+            return opportunities.OrderByDescending(o => o.MatchScore).ToList();
+        }
+
         public async Task<List<ScrapedOpportunity>> RankOpportunitiesAsync(List<ScrapedOpportunity> opportunities, CancellationToken cancellationToken)
         {
-            var profile = await GetProfileAsync(cancellationToken);
+            var profile = await GetDefaultProfileAsync(cancellationToken);
 
             foreach (var opportunity in opportunities)
             {

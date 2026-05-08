@@ -2,8 +2,8 @@ if (typeof API_BASE === 'undefined') {
   var API_BASE = "http://localhost:5153";
 }
 
-const message = document.getElementById("message");
-const demoButtons = document.querySelectorAll("[data-demo-message]");
+const alertMessage = document.getElementById("message");
+const alertDemoButtons = document.querySelectorAll("[data-demo-message]");
 
 let alertSummary = { activeRules: 0, todayTriggered: 0, pending: 0 };
 let alertRules = [];
@@ -73,14 +73,107 @@ function updateSummaryUI() {
 }
 
 function renderAlertRules() {
-  // For now, just log the rules
-  console.log('Alert rules loaded:', alertRules);
-  // TODO: Render alert rules in the UI
+  const rulesList = document.getElementById('rulesList');
+  if (!rulesList) return;
+
+  if (alertRules.length === 0) {
+    rulesList.innerHTML = '<p class="empty-state">No tienes reglas configuradas. Crea tu primera regla arriba.</p>';
+    return;
+  }
+
+  const rulesHTML = alertRules.map(rule => `
+    <div class="rule-item">
+      <div>
+        <h4>${rule.name}</h4>
+        <p>
+          Disparador: ${rule.triggerType} | 
+          Afinidad: ${JSON.parse(rule.conditionsJson).affinityScore}% | 
+          Canales: ${JSON.parse(rule.channelsJson).join(', ')}
+        </p>
+        <p>Destinatarios: ${JSON.parse(rule.recipientsJson).join(', ')}</p>
+      </div>
+      <div class="rule-actions">
+        <button class="edit-btn" onclick="editRule(${rule.ruleId})">Editar</button>
+        <button class="delete-btn" onclick="deleteRule(${rule.ruleId})">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+
+  rulesList.innerHTML = rulesHTML;
+}
+
+function resetForm() {
+  const form = document.getElementById('alertRuleForm');
+  if (form) {
+    form.reset();
+    // Reset checkboxes to default state
+    document.querySelector('input[name="channels"][value="email"]').checked = true;
+    document.querySelector('input[name="channels"][value="panel"]').checked = true;
+    document.querySelector('input[name="channels"][value="slack"]').checked = false;
+  }
+}
+
+async function editRule(ruleId) {
+  try {
+    const rule = alertRules.find(r => r.ruleId === ruleId);
+    if (!rule) return;
+
+    // Populate form with rule data
+    const form = document.getElementById('alertRuleForm');
+    if (form) {
+      form.ruleName.value = rule.name;
+      form.triggerType.value = rule.triggerType;
+      
+      const conditions = JSON.parse(rule.conditionsJson);
+      form.affinityScore.value = conditions.affinityScore;
+      form.status.value = conditions.status;
+      
+      const channels = JSON.parse(rule.channelsJson);
+      document.querySelectorAll('input[name="channels"]').forEach(checkbox => {
+        checkbox.checked = channels.includes(checkbox.value);
+      });
+      
+      const recipients = JSON.parse(rule.recipientsJson);
+      form.recipients.value = recipients.join(', ');
+      
+      form.messageTemplate.value = rule.messageTemplate;
+      form.isActive.checked = rule.isActive;
+    }
+
+    showMessage('Regla cargada para edición. Modifica y guarda los cambios.', 'info');
+  } catch (error) {
+    console.error('Error loading rule for edit:', error);
+    showMessage('Error al cargar regla para edición', 'error');
+  }
+}
+
+async function deleteRule(ruleId) {
+  if (!confirm('¿Estás seguro de que quieres eliminar esta regla?')) return;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/alerts/rules/${ruleId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+
+    if (response.ok) {
+      showMessage('Regla eliminada exitosamente.', 'success');
+      await loadAlertSummary();
+      await loadAlertRules();
+    } else if (response.status === 401) {
+      showMessage('Inicia sesión para eliminar reglas de alerta.', 'error');
+    } else {
+      showMessage('Error al eliminar regla de alerta', 'error');
+    }
+  } catch (error) {
+    console.error('Error deleting alert rule:', error);
+    showMessage('Error de conexión al eliminar regla de alerta', 'error');
+  }
 }
 
 function setupEventListeners() {
   // Demo buttons - show message instead of real functionality
-  demoButtons.forEach(button => {
+  alertDemoButtons.forEach(button => {
     button.addEventListener('click', (event) => {
       event.preventDefault();
       const message = button.getAttribute('data-demo-message');
@@ -88,36 +181,52 @@ function setupEventListeners() {
     });
   });
 
-  // Save rule button
-  const saveRuleButton = document.querySelector('button[type="button"]:has-text("Guardar regla")');
-  if (saveRuleButton) {
-    saveRuleButton.addEventListener('click', async (event) => {
-      event.preventDefault();
-      await saveAlertRule();
-    });
-  }
-
   // Send test button
-  const sendTestButton = document.querySelector('button[type="button"]:has-text("Enviar prueba")');
-  if (sendTestButton) {
+  const sendTestButton = document.querySelector('.secondary-button');
+  if (sendTestButton && sendTestButton.textContent.includes('Enviar prueba')) {
     sendTestButton.addEventListener('click', async (event) => {
       event.preventDefault();
       await sendTestEmail();
+    });
+  }
+
+  // Alert form submission
+  const alertForm = document.getElementById('alertRuleForm');
+  if (alertForm) {
+    alertForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await saveAlertRule();
     });
   }
 }
 
 async function saveAlertRule() {
   try {
-    // This is a simplified version - in production you'd collect form data
+    // Collect form data
+    const form = document.getElementById('alertRuleForm');
+    const formData = new FormData(form);
+    
+    // Get selected channels
+    const channels = [];
+    document.querySelectorAll('input[name="channels"]:checked').forEach(checkbox => {
+      channels.push(checkbox.value);
+    });
+    
+    // Get recipients as array
+    const recipientsText = formData.get('recipients');
+    const recipients = recipientsText.split(',').map(email => email.trim()).filter(email => email);
+    
     const newRule = {
-      name: "Nueva regla de alerta",
-      trigger: "alta_afinidad",
-      conditionsJson: JSON.stringify({ affinityScore: 85, status: "recomendado" }),
-      channelsJson: JSON.stringify(["email", "panel"]),
-      recipientsJson: JSON.stringify(["comercial@emdersoft.com"]),
-      messageTemplate: "Nueva licitación X con {score}% afinidad",
-      isActive: true
+      name: formData.get('ruleName'),
+      triggerType: formData.get('triggerType'),
+      conditionsJson: JSON.stringify({ 
+        affinityScore: parseInt(formData.get('affinityScore')), 
+        status: formData.get('status') 
+      }),
+      channelsJson: JSON.stringify(channels),
+      recipientsJson: JSON.stringify(recipients),
+      messageTemplate: formData.get('messageTemplate'),
+      isActive: formData.get('isActive') === 'on'
     };
 
     const response = await fetch(`${API_BASE}/api/alerts/rules`, {
@@ -163,13 +272,13 @@ async function sendTestEmail() {
 }
 
 function showMessage(text, type = 'info') {
-  if (message) {
-    message.textContent = text;
-    message.className = `message ${type}`;
-    message.style.display = 'block';
+  if (alertMessage) {
+    alertMessage.textContent = text;
+    alertMessage.className = `message ${type}`;
+    alertMessage.style.display = 'block';
     
     setTimeout(() => {
-      message.style.display = 'none';
+      alertMessage.style.display = 'none';
     }, 5000);
   }
 }

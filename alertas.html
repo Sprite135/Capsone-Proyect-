@@ -76,57 +76,37 @@
             <div class="card-header">
               <div>
                 <p class="eyebrow">Nueva regla</p>
-                <h3>Asi se veria el apartado para enviar notificaciones</h3>
+                <h3>Configura tu regla de alerta</h3>
               </div>
               <span class="tag">Borrador</span>
             </div>
 
-            <div class="builder-grid">
-              <div class="builder-block">
-                <div class="topbar-mini">
-                  <div>
-                    <p class="eyebrow">Disparador</p>
-                    <h4>Nueva oportunidad con alta afinidad</h4>
-                  </div>
-                  <span class="status active">Activo</span>
-                </div>
-                <p>Se activa cuando aparece una licitacion nueva con afinidad IA mayor a 85% y estado recomendado.</p>
+            <form id="alertRuleForm" class="alert-form">
+              <div class="form-group">
+                <label for="ruleName">Nombre de la regla</label>
+                <input type="text" id="ruleName" name="ruleName" placeholder="Ej: Alertas de alta afinidad" required>
               </div>
 
-              <div class="builder-block">
-                <div class="topbar-mini">
-                  <div>
-                    <p class="eyebrow">Condiciones</p>
-                    <h4>Filtros aplicados</h4>
-                  </div>
-                  <span class="metric-pill">3 filtros</span>
-                </div>
-                <div class="badge-list">
-                  <span class="tag">Rubro: Tecnologia</span>
-                  <span class="tag">Ubicacion: Lima</span>
-                  <span class="tag">Monto: mayor a S/ 200,000</span>
-                </div>
+              <div class="form-group">
+                <label for="triggerType">Tipo de disparador</label>
+                <select id="triggerType" name="triggerType" required>
+                  <option value="alta_afinidad">Alta afinidad</option>
+                  <option value="nueva_oportunidad">Nueva oportunidad</option>
+                  <option value="cierre_proximo">Cierre próximo</option>
+                </select>
               </div>
 
-              <div class="builder-block">
-                <div class="topbar-mini">
-                  <div>
-                    <p class="eyebrow">Destinatarios</p>
-                    <h4>Equipo comercial</h4>
-                  </div>
-                  <span class="metric-pill">4 usuarios</span>
-                </div>
-                <p>La regla notificaria a comercial, gerencia y al responsable del seguimiento asignado.</p>
+              <div class="form-group">
+                <label for="affinityScore">Afinidad mínima (%)</label>
+                <input type="number" id="affinityScore" name="affinityScore" min="0" max="100" value="85">
               </div>
 
-              <div class="builder-block">
-                <div class="topbar-mini">
-                  <div>
-                    <p class="eyebrow">Frecuencia</p>
-                    <h4>Envio inmediato</h4>
-                  </div>
-                  <span class="status review">Sin resumen</span>
-                </div>
+              <div class="form-group">
+                <label for="status">Estado requerido</label>
+                <select id="status" name="status">
+                  <option value="recomendado">Recomendado</option>
+                  <option value="cualquiera">Cualquiera</option>
+                </select>
                 <p>Cuando el evento ocurre, el sistema manda el aviso en el momento y lo registra en historial.</p>
               </div>
             </div>
