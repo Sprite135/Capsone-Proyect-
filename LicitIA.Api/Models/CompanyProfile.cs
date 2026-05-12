@@ -30,6 +30,8 @@ public sealed record CompanyProfile
 
     public List<string> ExcludedKeywords { get; init; } = new();
 
+    public string SeaceObjectDescription { get; init; } = string.Empty;
+
     public int MinDaysToClose { get; init; } = 3;
 
     public int MaxDaysToClose { get; init; } = 30;

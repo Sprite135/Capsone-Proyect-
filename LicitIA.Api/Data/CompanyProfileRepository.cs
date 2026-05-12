@@ -18,27 +18,53 @@ public class CompanyProfileRepository
 
     public async Task<Models.CompanyProfile?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken)
     {
-        await using var connection = _connectionFactory.CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-
-        const string sql = @"
-            SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
-                   MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
-                   CreatedAtUtc, UpdatedAtUtc
-            FROM dbo.CompanyProfile
-            WHERE UserId = @UserId;";
-
-        await using var command = new SqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@UserId", userId);
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (await reader.ReadAsync(cancellationToken))
+        try
         {
-            return MapCompanyProfile(reader);
-        }
+            await using var connection = _connectionFactory.CreateConnection();
+            
+            // Use only the original cancellation token
+            // Remove aggressive timeout to prevent cancellation loops
+            
+            Console.WriteLine($"[CompanyProfileRepository] Opening connection for userId: {userId}");
+            await connection.OpenAsync(cancellationToken);
+            Console.WriteLine($"[CompanyProfileRepository] Connection opened successfully");
 
-        return null;
+            const string sql =@"
+                SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
+                       MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
+                       PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                       CreatedAtUtc, UpdatedAtUtc
+                FROM dbo.CompanyProfile
+                WHERE UserId = @UserId;";
+
+            await using var command = new SqlCommand(sql, connection);
+            command.CommandTimeout = 30; // 30 second command timeout
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            Console.WriteLine($"[CompanyProfileRepository] Executing query for userId: {userId}");
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            Console.WriteLine($"[CompanyProfileRepository] Query executed successfully");
+
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                Console.WriteLine($"[CompanyProfileRepository] Profile found for userId: {userId}");
+                return MapCompanyProfile(reader);
+            }
+
+            Console.WriteLine($"[CompanyProfileRepository] No profile found for userId: {userId}");
+            return null;
+        }
+        catch (OperationCanceledException ex)
+        {
+            Console.WriteLine($"[CompanyProfileRepository] Operation cancelled for userId {userId}: {ex.Message}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CompanyProfileRepository] Error getting profile for userId {userId}: {ex.Message}");
+            Console.WriteLine($"[CompanyProfileRepository] Error type: {ex.GetType().Name}");
+            throw;
+        }
     }
 
     public async Task<Models.CompanyProfile?> GetDefaultProfileAsync(CancellationToken cancellationToken)
@@ -49,7 +75,7 @@ public class CompanyProfileRepository
         const string sql = @"
             SELECT TOP 1 ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                    MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                    CreatedAtUtc, UpdatedAtUtc
             FROM dbo.CompanyProfile
             WHERE UserId IS NULL
@@ -74,7 +100,7 @@ public class CompanyProfileRepository
         const string sql = @"
             SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                    MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                    CreatedAtUtc, UpdatedAtUtc
             FROM dbo.CompanyProfile
             WHERE UserId IS NOT NULL
@@ -100,12 +126,12 @@ public class CompanyProfileRepository
         const string sql = @"
             INSERT INTO dbo.CompanyProfile (UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                                             MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                                            PreferredKeywords, ExcludedKeywords, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, 
+                                            PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, 
                                             CreatedAtUtc, UpdatedAtUtc)
             OUTPUT INSERTED.ProfileId
             VALUES (@UserId, @CompanyName, @PreferredCategories, @PreferredLocations, @PreferredModalities,
                     @MinAmount, @MaxAmount, @IdealAmount, @FavoriteEntities, @ExcludedEntities, 
-                    @PreferredKeywords, @ExcludedKeywords, @MinDaysToClose, @MaxDaysToClose, @IdealDaysToClose,
+                    @PreferredKeywords, @ExcludedKeywords, @SeaceObjectDescription, @MinDaysToClose, @MaxDaysToClose, @IdealDaysToClose,
                     GETUTCDATE(), GETUTCDATE());";
 
         await using var command = new SqlCommand(sql, connection);
@@ -121,6 +147,7 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@ExcludedEntities", JsonSerializer.Serialize(profile.ExcludedEntities));
         command.Parameters.AddWithValue("@PreferredKeywords", JsonSerializer.Serialize(profile.PreferredKeywords));
         command.Parameters.AddWithValue("@ExcludedKeywords", JsonSerializer.Serialize(profile.ExcludedKeywords));
+        command.Parameters.AddWithValue("@SeaceObjectDescription", profile.SeaceObjectDescription.Trim());
         command.Parameters.AddWithValue("@MinDaysToClose", profile.MinDaysToClose);
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
@@ -147,6 +174,7 @@ public class CompanyProfileRepository
                 ExcludedEntities = @ExcludedEntities,
                 PreferredKeywords = @PreferredKeywords,
                 ExcludedKeywords = @ExcludedKeywords,
+                SeaceObjectDescription = @SeaceObjectDescription,
                 MinDaysToClose = @MinDaysToClose,
                 MaxDaysToClose = @MaxDaysToClose,
                 IdealDaysToClose = @IdealDaysToClose,
@@ -168,6 +196,7 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@ExcludedEntities", JsonSerializer.Serialize(profile.ExcludedEntities));
         command.Parameters.AddWithValue("@PreferredKeywords", JsonSerializer.Serialize(profile.PreferredKeywords));
         command.Parameters.AddWithValue("@ExcludedKeywords", JsonSerializer.Serialize(profile.ExcludedKeywords));
+        command.Parameters.AddWithValue("@SeaceObjectDescription", profile.SeaceObjectDescription.Trim());
         command.Parameters.AddWithValue("@MinDaysToClose", profile.MinDaysToClose);
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
@@ -212,6 +241,7 @@ public class CompanyProfileRepository
             ExcludedEntities = DeserializeList<List<string>>("ExcludedEntities"),
             PreferredKeywords = DeserializeList<List<string>>("PreferredKeywords"),
             ExcludedKeywords = DeserializeList<List<string>>("ExcludedKeywords"),
+            SeaceObjectDescription = reader.IsDBNull(reader.GetOrdinal("SeaceObjectDescription")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceObjectDescription")),
             MinDaysToClose = reader.GetInt32(reader.GetOrdinal("MinDaysToClose")),
             MaxDaysToClose = reader.GetInt32(reader.GetOrdinal("MaxDaysToClose")),
             IdealDaysToClose = reader.GetInt32(reader.GetOrdinal("IdealDaysToClose")),

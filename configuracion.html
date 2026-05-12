@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260512-4">
 </head>
 <body>
   <div class="app-shell">
@@ -45,8 +45,13 @@
         </div>
         <div class="topbar-actions">
           <div class="account-actions">
+            <div class="account-summary" aria-label="Cuenta activa">
+              <strong id="accountName">Cuenta activa</strong>
+              <span id="accountEmail">Inicia sesion para ver tu correo</span>
+              <small id="accountRole">Rol no disponible</small>
+            </div>
             <a class="secondary-button logout-button" href="home.html">Cerrar sesion</a>
-            <div class="user-chip">ES</div>
+            <div id="userChip" class="user-chip">US</div>
           </div>
         </div>
       </header>
@@ -64,6 +69,21 @@
             <label for="companyName">Nombre de Empresa</label>
             <input type="text" id="companyName" placeholder="Ej: Mi Empresa S.A.C." class="form-control">
             <small class="help-text">Este nombre se usará para identificar tu perfil de empresa.</small>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Filtro SEACE</p>
+              <h3>Descripcion del objeto</h3>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="seaceObjectDescription">Descripcion del Objeto</label>
+            <input type="text" id="seaceObjectDescription" placeholder="Ej: soporte tecnico, mantenimiento, software..." class="form-control" maxlength="500">
+            <small class="help-text">Cuando sincronices SEACE, este texto se escribira en el campo descripcionObjeto antes de buscar.</small>
           </div>
         </div>
 
@@ -135,6 +155,6 @@
     </main>
   </div>
 
-  <script src="config.js"></script>
+  <script src="config.js?v=20260512-4"></script>
 </body>
 </html>

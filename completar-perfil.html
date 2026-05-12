@@ -107,6 +107,11 @@
         if (response.ok) {
           // Store token and redirect to dashboard
           localStorage.setItem('authToken', token);
+          localStorage.setItem('authUser', JSON.stringify({
+            fullName: name,
+            email: email,
+            role: formData.role
+          }));
           window.AUTH_TOKEN = token;
           window.location.href = 'index.html';
         } else {

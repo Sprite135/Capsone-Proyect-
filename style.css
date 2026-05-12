@@ -460,6 +460,7 @@ h4,
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .action-group {
@@ -583,6 +584,39 @@ input.search-box:focus {
 
 .logout-button {
   white-space: nowrap;
+}
+
+.account-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 180px;
+  max-width: 260px;
+  text-align: right;
+}
+
+.account-summary strong,
+.account-summary span,
+.account-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-summary strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.account-summary span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.account-summary small {
+  color: #9fb7da;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .user-chip {
@@ -2349,6 +2383,12 @@ td {
     margin-left: 0;
     justify-content: center;
     width: 100%;
+  }
+
+  .account-summary {
+    flex: 1 1 100%;
+    max-width: 100%;
+    text-align: center;
   }
 }
 

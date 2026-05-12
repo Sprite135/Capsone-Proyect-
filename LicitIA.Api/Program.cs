@@ -780,6 +780,7 @@ app.MapPost("/api/seace/refresh", async (
     SeaceScraperService seaceScraperService,
     AffinityService affinityService,
     OpportunityRepository repository,
+    CompanyProfileRepository profileRepository,
     IOptions<JwtOptions> jwtOptions,
     HttpContext httpContext,
     CancellationToken cancellationToken,
@@ -795,12 +796,19 @@ app.MapPost("/api/seace/refresh", async (
 
         Console.WriteLine($"[SeaceScraper] Iniciando refresh de SEACE para usuario {userId} - limpiando BD y descargando {maxResults} oportunidades...");
 
+        var profile = await profileRepository.GetByUserIdAsync(userId.Value, cancellationToken);
+        var objectDescription = profile?.SeaceObjectDescription;
+        if (!string.IsNullOrWhiteSpace(objectDescription))
+        {
+            Console.WriteLine($"[SeaceScraper] Usando filtro Descripcion del Objeto: {objectDescription}");
+        }
+
         // Limpiar todas las oportunidades existentes
         await repository.ClearAllOpportunitiesAsync(cancellationToken);
         Console.WriteLine($"[SeaceScraper] Base de datos limpiada.");
 
         // Descargar datos de SEACE
-        var seaceOpportunities = await seaceScraperService.ScrapeOpportunitiesAsync(maxResults, cancellationToken);
+        var seaceOpportunities = await seaceScraperService.ScrapeOpportunitiesAsync(maxResults, cancellationToken, objectDescription);
 
         if (seaceOpportunities.Count == 0)
         {

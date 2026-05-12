@@ -19,6 +19,7 @@ window.addEventListener("message", (event) => {
     try {
       localStorage.setItem("authToken", event.data.token);
       window.AUTH_TOKEN = event.data.token;
+      storeAuthUser(event.data.user || readUserFromToken(event.data.token));
     } catch (e) {
       // ignore storage errors
     }
@@ -60,7 +61,13 @@ function openGoogleAuthWindow(authUrl) {
     return;
   }
 
-  popup.focus();
+  // Try to focus popup with error handling for Cross-Origin-Opener-Policy
+  try {
+    popup.focus();
+  } catch (error) {
+    console.log("[Google Auth] Could not focus popup due to Cross-Origin policy:", error.message);
+    // Focus is optional, continue without it
+  }
 }
 
 if (authForm) {
@@ -134,6 +141,7 @@ if (authForm) {
         try {
           localStorage.setItem("authToken", data.token);
           window.AUTH_TOKEN = data.token;
+          storeAuthUser(data.user || readUserFromToken(data.token));
         } catch (e) {
           // ignore storage errors
         }
@@ -177,6 +185,39 @@ function readValidationMessage(data) {
   return Array.isArray(messages) && messages.length > 0 ? messages[0] : "";
 }
 
+function storeAuthUser(user) {
+  if (!user) {
+    return;
+  }
+
+  localStorage.setItem("authUser", JSON.stringify({
+    fullName: user.fullName || user.name || "",
+    email: user.email || "",
+    role: user.role || ""
+  }));
+}
+
+function readUserFromToken(token) {
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) {
+      return null;
+    }
+
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
+    const json = JSON.parse(decodeURIComponent(escape(atob(padded))));
+
+    return {
+      fullName: json.unique_name || json.name || "",
+      email: json.email || "",
+      role: json.role || json["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || ""
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // Password visibility toggle for any .password-toggle buttons
 document.addEventListener("click", (e) => {
   const btn = e.target.closest && e.target.closest('.password-toggle');
@@ -208,6 +249,11 @@ document.addEventListener("click", (e) => {
     try {
       localStorage.setItem('authToken', token);
       window.AUTH_TOKEN = token;
+      storeAuthUser({
+        fullName: name || '',
+        email: urlParams.get('email') || '',
+        role: ''
+      });
     } catch (e) {
       // ignore storage errors
     }

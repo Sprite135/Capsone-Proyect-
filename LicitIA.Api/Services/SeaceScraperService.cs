@@ -17,14 +17,17 @@ public class SeaceScraperService
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
 
-    public async Task<List<ScrapedOpportunity>> ScrapeOpportunitiesAsync(int maxResults = 30, CancellationToken cancellationToken = default)
+    public async Task<List<ScrapedOpportunity>> ScrapeOpportunitiesAsync(
+        int maxResults = 30,
+        CancellationToken cancellationToken = default,
+        string? objectDescription = null)
     {
         try
         {
             Console.WriteLine("[SeaceScraper] Iniciando scraping con Playwright...");
 
             // Usar Playwright para scraping de SEACE
-            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken);
+            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription);
 
             if (opportunities.Count > 0)
             {
@@ -44,7 +47,7 @@ public class SeaceScraperService
         }
     }
 
-    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken)
+    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription)
     {
         var opportunities = new List<ScrapedOpportunity>();
 
@@ -93,6 +96,8 @@ public class SeaceScraperService
                     if (target) target.click();
                 }");
             }
+
+            await ApplyObjectDescriptionFilterAsync(page, objectDescription);
 
             Console.WriteLine("[SeaceScraper] Esperando botón 'Buscar'...");
             try
@@ -405,6 +410,62 @@ public class SeaceScraperService
         {
             Console.WriteLine($"[SeaceScraper] Error en Playwright: {ex.Message}");
             return new List<ScrapedOpportunity>();
+        }
+    }
+
+    private async Task ApplyObjectDescriptionFilterAsync(IPage page, string? objectDescription)
+    {
+        if (string.IsNullOrWhiteSpace(objectDescription))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtro de Descripcion del Objeto configurado.");
+            return;
+        }
+
+        var description = objectDescription.Trim();
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro Descripcion del Objeto: {description}");
+
+        try
+        {
+            const string selector = "#tbBuscador\\:idFormBuscarProceso\\:descripcionObjeto";
+            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var input = await page.QuerySelectorAsync(selector);
+            if (input != null)
+            {
+                await input.FillAsync(description);
+                Console.WriteLine("[SeaceScraper] Filtro Descripcion del Objeto escrito en el formulario.");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo llenar descripcionObjeto con selector directo: {ex.Message}");
+        }
+
+        try
+        {
+            var applied = await page.EvaluateAsync<bool>(
+                @"(description) => {
+                    const input = document.getElementById('tbBuscador:idFormBuscarProceso:descripcionObjeto');
+                    if (!input) return false;
+
+                    input.value = description;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }",
+                description);
+
+            Console.WriteLine(applied
+                ? "[SeaceScraper] Filtro Descripcion del Objeto escrito por JavaScript."
+                : "[SeaceScraper] No se encontro el input descripcionObjeto.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] Error aplicando filtro Descripcion del Objeto: {ex.Message}");
         }
     }
 
