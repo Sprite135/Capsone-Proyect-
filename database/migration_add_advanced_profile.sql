@@ -55,4 +55,10 @@ BEGIN
     PRINT 'Added: SeaceObjectDescription';
 END
 
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CompanyProfile') AND name = 'SeaceCallYear')
+BEGIN
+    ALTER TABLE dbo.CompanyProfile ADD SeaceCallYear INT NOT NULL DEFAULT (YEAR(GETDATE()));
+    PRINT 'Added: SeaceCallYear';
+END
+
 PRINT 'Migration completed successfully.';

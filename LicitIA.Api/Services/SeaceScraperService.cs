@@ -20,14 +20,15 @@ public class SeaceScraperService
     public async Task<List<ScrapedOpportunity>> ScrapeOpportunitiesAsync(
         int maxResults = 30,
         CancellationToken cancellationToken = default,
-        string? objectDescription = null)
+        string? objectDescription = null,
+        int? callYear = null)
     {
         try
         {
             Console.WriteLine("[SeaceScraper] Iniciando scraping con Playwright...");
 
             // Usar Playwright para scraping de SEACE
-            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription);
+            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear);
 
             if (opportunities.Count > 0)
             {
@@ -47,7 +48,7 @@ public class SeaceScraperService
         }
     }
 
-    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription)
+    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear)
     {
         var opportunities = new List<ScrapedOpportunity>();
 
@@ -97,6 +98,7 @@ public class SeaceScraperService
                 }");
             }
 
+            await ApplyCallYearFilterAsync(page, callYear);
             await ApplyObjectDescriptionFilterAsync(page, objectDescription);
 
             Console.WriteLine("[SeaceScraper] Esperando botón 'Buscar'...");
@@ -410,6 +412,117 @@ public class SeaceScraperService
         {
             Console.WriteLine($"[SeaceScraper] Error en Playwright: {ex.Message}");
             return new List<ScrapedOpportunity>();
+        }
+    }
+
+    private async Task ApplyCallYearFilterAsync(IPage page, int? callYear)
+    {
+        var currentYear = DateTime.UtcNow.Year;
+        var year = callYear.HasValue && callYear.Value >= 2004 && callYear.Value <= currentYear
+            ? callYear.Value
+            : currentYear;
+        var yearText = year.ToString();
+
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro Anio de Convocatoria: {year}");
+
+        try
+        {
+            const string rootSelector = "#tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria";
+            const string panelSelector = "#tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria_panel";
+
+            await page.WaitForSelectorAsync(rootSelector, new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var opened = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const root = document.getElementById('tbBuscador:idFormBuscarProceso:anioConvocatoria');
+                    if (!root) return false;
+
+                    const trigger = root.querySelector('.ui-selectonemenu-trigger');
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:anioConvocatoria_label');
+                    const clickable = trigger || label || root;
+                    clickable.click();
+                    return true;
+                }");
+
+            if (!opened)
+            {
+                Console.WriteLine("[SeaceScraper] No se pudo abrir el combo anioConvocatoria.");
+            }
+            else
+            {
+                Console.WriteLine("[SeaceScraper] Combo Anio de Convocatoria abierto.");
+            }
+
+            await page.WaitForSelectorAsync($"{panelSelector} li.ui-selectonemenu-item", new PageWaitForSelectorOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10000
+            });
+
+            var selected = await page.EvaluateAsync<bool>(
+                @"(year) => {
+                    const panel = document.getElementById('tbBuscador:idFormBuscarProceso:anioConvocatoria_panel');
+                    if (!panel) return false;
+
+                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item'));
+                    const option = items.find(item => {
+                        const value = (item.getAttribute('data-label') || item.textContent || '').trim();
+                        return value === String(year);
+                    });
+
+                    if (!option) return false;
+
+                    option.click();
+                    return true;
+                }",
+                yearText);
+
+            if (selected)
+            {
+                await Task.Delay(500);
+                var selectedLabel = await page.TextContentAsync("#tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria_label");
+                Console.WriteLine($"[SeaceScraper] Anio de Convocatoria seleccionado en UI: {selectedLabel}");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar el anio desde el combo visible: {ex.Message}");
+        }
+
+        try
+        {
+            var applied = await page.EvaluateAsync<bool>(
+                @"(year) => {
+                    const rootId = 'tbBuscador:idFormBuscarProceso:anioConvocatoria';
+                    const root = document.getElementById(rootId);
+                    const label = document.getElementById(rootId + '_label');
+                    const hidden = document.getElementById(rootId + '_input')
+                        || document.querySelector(`input[name='${rootId}_input']`)
+                        || document.querySelector(`select[name='${rootId}_input']`);
+
+                    if (label) label.textContent = String(year);
+
+                    if (hidden) {
+                        hidden.value = String(year);
+                        hidden.dispatchEvent(new Event('input', { bubbles: true }));
+                        hidden.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    return Boolean(root || label || hidden);
+                }",
+                yearText);
+
+            Console.WriteLine(applied
+                ? "[SeaceScraper] Filtro Anio de Convocatoria aplicado por JavaScript como fallback."
+                : "[SeaceScraper] No se encontro el combo anioConvocatoria.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] Error aplicando filtro Anio de Convocatoria: {ex.Message}");
         }
     }
 

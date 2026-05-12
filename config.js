@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   isConfigInitialized = true;
+  populateSeaceYearOptions();
   hydrateAccountPanel();
   await loadProfile();
   setupEventListeners();
@@ -76,9 +77,30 @@ function populateForm(profile) {
     seaceObjectDescriptionInput.value = profile.seaceObjectDescription || '';
   }
 
+  const seaceCallYearInput = document.getElementById('seaceCallYear');
+  if (seaceCallYearInput) {
+    seaceCallYearInput.value = String(normalizeSeaceYear(profile.seaceCallYear));
+  }
+
   preferredKeywords = profile.preferredKeywords || [];
   excludedKeywords = profile.excludedKeywords || [];
   renderKeywords();
+}
+
+function populateSeaceYearOptions() {
+  const select = document.getElementById('seaceCallYear');
+  if (!select) {
+    return;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let year = currentYear; year >= 2004; year -= 1) {
+    years.push(`<option value="${year}">${year}</option>`);
+  }
+
+  select.innerHTML = years.join('');
+  select.value = String(currentYear);
 }
 
 function setupEventListeners() {
@@ -298,6 +320,8 @@ function getFormData() {
   const companyName = companyNameInput ? companyNameInput.value.trim() : 'Default';
   const seaceObjectDescriptionInput = document.getElementById('seaceObjectDescription');
   const seaceObjectDescription = seaceObjectDescriptionInput ? seaceObjectDescriptionInput.value.trim() : '';
+  const seaceCallYearInput = document.getElementById('seaceCallYear');
+  const seaceCallYear = normalizeSeaceYear(seaceCallYearInput ? Number(seaceCallYearInput.value) : null);
 
   return {
     companyName: companyName || 'Default',
@@ -312,10 +336,17 @@ function getFormData() {
     preferredKeywords: preferredKeywords || [],
     excludedKeywords: excludedKeywords || [],
     seaceObjectDescription,
+    seaceCallYear,
     minDaysToClose: currentProfile?.minDaysToClose || 3,
     maxDaysToClose: currentProfile?.maxDaysToClose || 30,
     idealDaysToClose: currentProfile?.idealDaysToClose || 15
   };
+}
+
+function normalizeSeaceYear(value) {
+  const currentYear = new Date().getFullYear();
+  const year = Number(value);
+  return Number.isInteger(year) && year >= 2004 && year <= currentYear ? year : currentYear;
 }
 
 function resetForm() {

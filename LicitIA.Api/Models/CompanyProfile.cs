@@ -32,6 +32,8 @@ public sealed record CompanyProfile
 
     public string SeaceObjectDescription { get; init; } = string.Empty;
 
+    public int SeaceCallYear { get; init; } = DateTime.UtcNow.Year;
+
     public int MinDaysToClose { get; init; } = 3;
 
     public int MaxDaysToClose { get; init; } = 30;

@@ -798,17 +798,19 @@ app.MapPost("/api/seace/refresh", async (
 
         var profile = await profileRepository.GetByUserIdAsync(userId.Value, cancellationToken);
         var objectDescription = profile?.SeaceObjectDescription;
+        var callYear = profile?.SeaceCallYear ?? DateTime.UtcNow.Year;
         if (!string.IsNullOrWhiteSpace(objectDescription))
         {
             Console.WriteLine($"[SeaceScraper] Usando filtro Descripcion del Objeto: {objectDescription}");
         }
+        Console.WriteLine($"[SeaceScraper] Usando filtro Año de Convocatoria: {callYear}");
 
         // Limpiar todas las oportunidades existentes
         await repository.ClearAllOpportunitiesAsync(cancellationToken);
         Console.WriteLine($"[SeaceScraper] Base de datos limpiada.");
 
         // Descargar datos de SEACE
-        var seaceOpportunities = await seaceScraperService.ScrapeOpportunitiesAsync(maxResults, cancellationToken, objectDescription);
+        var seaceOpportunities = await seaceScraperService.ScrapeOpportunitiesAsync(maxResults, cancellationToken, objectDescription, callYear);
 
         if (seaceOpportunities.Count == 0)
         {
