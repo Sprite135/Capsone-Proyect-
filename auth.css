@@ -2,11 +2,15 @@
   --bg: #08111f;
   --panel: rgba(11, 24, 40, 0.88);
   --panel-soft: rgba(255, 255, 255, 0.04);
+  --panel-strong: rgba(15, 35, 58, 0.96);
   --text: #e7f0ff;
   --muted: #92a4bf;
   --line: rgba(154, 181, 219, 0.12);
   --blue: #3b82f6;
   --teal: #1cc8b7;
+  --gold: #f2c14e;
+  --accent: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.14);
   --shadow: rgba(2, 8, 23, 0.38);
 }
 
@@ -20,8 +24,8 @@ body {
   font-family: "Manrope", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(28, 200, 183, 0.12), transparent 20%),
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(28, 200, 183, 0.13), transparent 22%),
     linear-gradient(180deg, #07101d, #0a1526 52%, #08111f);
 }
 
@@ -49,7 +53,7 @@ select {
   width: min(1080px, 100%);
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 32px;
+  border-radius: 28px;
   background: linear-gradient(180deg, #0b1729, #0f1d32);
   box-shadow: 0 24px 80px var(--shadow);
 }
@@ -61,8 +65,22 @@ select {
 
 .auth-side {
   background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 32%),
-    linear-gradient(180deg, rgba(18, 42, 73, 0.96), rgba(10, 24, 40, 0.96));
+    linear-gradient(160deg, rgba(24, 53, 88, 0.98), rgba(9, 22, 38, 0.96));
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-side::before {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 22px;
+  pointer-events: none;
+}
+
+.auth-side > * {
+  position: relative;
 }
 
 .eyebrow {
@@ -93,6 +111,33 @@ select {
   line-height: 1.8;
 }
 
+.auth-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.auth-metrics div {
+  display: grid;
+  gap: 4px;
+  min-height: 86px;
+  padding: 14px;
+  border: 1px solid rgba(154, 181, 219, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.auth-metrics strong {
+  font-family: "Sora", sans-serif;
+  font-size: 1.1rem;
+}
+
+.auth-metrics span {
+  color: #b6c8df;
+  font-size: 0.82rem;
+}
+
 .benefits {
   display: grid;
   gap: 16px;
@@ -104,7 +149,7 @@ select {
   gap: 6px;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--panel-soft);
 }
 
@@ -134,13 +179,22 @@ select {
   justify-content: center;
   padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--panel-soft);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
 .switch-link {
   color: #cfe1ff;
   background: rgba(59, 130, 246, 0.12);
+}
+
+.back-link:hover,
+.switch-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(154, 181, 219, 0.28);
 }
 
 .auth-form {
@@ -165,10 +219,11 @@ select {
   width: 100%;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 12px;
   color: var(--text);
-  background: var(--panel-soft);
+  background: rgba(255, 255, 255, 0.045);
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 /* Password toggle styling */
@@ -335,10 +390,10 @@ select {
   justify-content: center;
   width: 100%;
   border: 0;
-  border-radius: 999px;
+  border-radius: 14px;
   padding: 15px 22px;
   color: white;
-  background: linear-gradient(135deg, var(--blue), #4f95ff);
+  background: linear-gradient(135deg, var(--blue), var(--teal));
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 12px 28px rgba(22, 119, 255, 0.22);
@@ -383,7 +438,7 @@ select {
   gap: 12px;
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 14px;
   padding: 14px 22px;
   color: var(--text);
   background: var(--panel-soft);
@@ -436,8 +491,9 @@ select {
 }
 
 .form-status {
-  min-height: 24px;
+  min-height: 0;
   margin: 0;
+  padding: 0;
   font-size: 0.95rem;
   font-weight: 700;
 }
@@ -448,6 +504,13 @@ select {
 
 .form-status.error {
   color: #ff9d9d;
+}
+
+.form-status.success,
+.form-status.error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .footer-link {
@@ -514,5 +577,17 @@ select {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .auth-page {
+    padding: 12px;
+  }
+
+  .auth-shell {
+    border-radius: 20px;
+  }
+
+  .auth-metrics {
+    grid-template-columns: 1fr;
   }
 }

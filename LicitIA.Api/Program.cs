@@ -1157,8 +1157,9 @@ app.MapDelete("/api/alerts/rules/{id}", async (
     }
 }).RequireAuthorization();
 
-app.MapPost("/api/alerts/send-test", async (
-    AlertService alertService,
+app.MapPost("/api/alerts/check-now", async (
+    bool? force,
+    AlertSchedulerService alertScheduler,
     IOptions<JwtOptions> jwtOptions,
     HttpContext httpContext,
     CancellationToken cancellationToken) =>
@@ -1171,12 +1172,51 @@ app.MapPost("/api/alerts/send-test", async (
             return Results.Unauthorized();
         }
 
-        // Get user email from auth repository to send test email
-        // For now, use a placeholder
-        var userEmail = "user@example.com"; // TODO: Get from user context
+        var forceMode = force ?? false;
+        var result = await alertScheduler.RunOnceForUserAsync(userId.Value, forceMode, cancellationToken);
+        return Results.Ok(new
+        {
+            message = forceMode
+                ? "Revision forzada ejecutada."
+                : "Revision de alertas ejecutada.",
+            result.RulesProcessed,
+            result.OpportunitiesMatched,
+            result.SummariesCreated,
+            force = forceMode
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error al revisar alertas",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+}).RequireAuthorization();
 
-        await alertService.SendTestEmailAsync(userEmail, "Prueba de Alerta", cancellationToken);
-        return Results.Ok(new { message = "Correo de prueba enviado exitosamente." });
+app.MapPost("/api/alerts/send-test", async (
+    AlertService alertService,
+    AuthRepository authRepository,
+    IOptions<JwtOptions> jwtOptions,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var user = await authRepository.GetByIdAsync(userId.Value, cancellationToken);
+        if (user is null)
+        {
+            return Results.NotFound(new { message = "No se encontro el usuario autenticado." });
+        }
+
+        await alertService.SendTestEmailAsync(user.Email, "Prueba de Alerta", cancellationToken);
+        return Results.Ok(new { message = $"Correo de prueba enviado a {user.Email}." });
     }
     catch (Exception ex)
     {

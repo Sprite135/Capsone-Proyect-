@@ -49,6 +49,39 @@ public sealed class AuthRepository
         return MapUser(reader);
     }
 
+    public async Task<AppUser?> GetByIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string sql = """
+            SELECT TOP (1)
+                UserId,
+                FullName,
+                CompanyName,
+                Email,
+                RoleName,
+                PasswordHash,
+                PasswordSalt,
+                IsActive,
+                CreatedAtUtc
+            FROM dbo.AppUsers
+            WHERE UserId = @UserId
+              AND IsActive = 1;
+            """;
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return MapUser(reader);
+    }
+
     public async Task<AppUser> CreateUserAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
         var (passwordHash, passwordSalt) = _passwordService.HashPassword(request.Password);

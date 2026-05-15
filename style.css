@@ -171,6 +171,8 @@ html {
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.75rem;
+  min-width: 82px;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
 }
 
 .rule-item .edit-btn {
@@ -181,6 +183,31 @@ html {
 .rule-item .delete-btn {
   background: rgba(255, 107, 107, 0.1);
   color: var(--red);
+}
+
+.rule-item .edit-btn:hover,
+.rule-item .delete-btn:hover {
+  transform: translateY(-1px);
+}
+
+.rule-item .delete-btn.confirm-delete {
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid rgba(255, 107, 107, 0.38);
+  color: #ffd7d7;
+}
+
+.activity-list li.is-unread {
+  border-color: rgba(242, 193, 78, 0.38);
+  background: rgba(242, 193, 78, 0.08);
+}
+
+.activity-list li.is-read {
+  opacity: 0.78;
+}
+
+.activity-list li .small-button {
+  justify-self: start;
+  margin-top: 0.35rem;
 }
 
 .empty-state {
@@ -2266,10 +2293,42 @@ td {
 }
 
 .message {
-  min-height: 24px;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: none;
+  max-width: min(420px, calc(100vw - 32px));
+  min-height: auto;
   margin: 0;
-  color: var(--blue);
+  padding: 14px 16px;
+  border: 1px solid rgba(154, 181, 219, 0.2);
+  border-radius: 12px;
+  color: var(--text);
+  background: rgba(10, 21, 38, 0.96);
+  box-shadow: 0 18px 50px rgba(2, 8, 23, 0.45);
   font-weight: 700;
+  line-height: 1.45;
+}
+
+.message.info {
+  border-color: rgba(59, 130, 246, 0.38);
+}
+
+.message.success {
+  border-color: rgba(28, 200, 183, 0.42);
+}
+
+.message.error {
+  border-color: rgba(255, 107, 107, 0.48);
+}
+
+button:disabled,
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+  transform: none;
 }
 
 .result-empty {

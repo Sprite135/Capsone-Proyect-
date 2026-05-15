@@ -96,7 +96,8 @@ if (authForm) {
     const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
 
     try {
-      setStatus("Conectando con el backend...", "success");
+      setStatus(mode === "login" ? "Validando acceso..." : "Creando cuenta...", "success");
+      submitButton.textContent = mode === "login" ? "Entrando..." : "Creando...";
       submitButton.disabled = true;
 
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -156,6 +157,7 @@ if (authForm) {
         "No fue posible conectar con la API. Verifica que LicitIA.Api este ejecutandose en http://localhost:5153.",
         "error");
     } finally {
+      submitButton.textContent = mode === "login" ? "Entrar al sistema" : "Crear cuenta";
       submitButton.disabled = false;
     }
   });
