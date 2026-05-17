@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260515-3">
 </head>
 <body>
   <div class="app-shell">
@@ -90,30 +90,20 @@
             <div class="card-header">
               <div>
                 <p class="eyebrow">Analisis IA</p>
-                <h3>Motivos de la recomendacion</h3>
+                <h3>Analisis avanzado con Gemini</h3>
               </div>
-              <span class="tag">Confianza alta</span>
+              <span class="tag" id="aiQuotaTag">IA opcional</span>
             </div>
-            <div class="check-list">
-              <div class="check-item">
-                <span class="check-mark">1</span>
-                <div>
-                  <strong>Rubro coincidente</strong>
-                  <p>El objeto del proceso se alinea con servicios de soporte TI y mesa de ayuda ya atendidos.</p>
-                </div>
-              </div>
-              <div class="check-item">
-                <span class="check-mark">2</span>
-                <div>
-                  <strong>Ticket compatible</strong>
-                  <p>El monto esperado se ubica dentro del rango objetivo definido para el equipo comercial.</p>
-                </div>
-              </div>
-              <div class="check-item">
-                <span class="check-mark">3</span>
-                <div>
-                  <strong>Riesgo moderado</strong>
-                  <p>Las bases exigen experiencia especifica que debe confirmarse antes de preparar la propuesta.</p>
+            <div class="ai-panel">
+              <p id="aiStatusText">La recomendacion basica ya esta disponible. Gemini se usa solo si solicitas analisis avanzado.</p>
+              <button class="primary-button" id="runAiAnalysisButton" type="button">Analizar con IA</button>
+              <div class="check-list ai-analysis-list" id="aiAnalysisList">
+                <div class="check-item">
+                  <span class="check-mark">1</span>
+                  <div>
+                    <strong>Recomendacion local</strong>
+                    <p>Usa el puntaje de afinidad y tus keywords sin consumir Gemini.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,6 +160,6 @@
     </main>
   </div>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=20260515-3"></script>
 </body>
 </html>

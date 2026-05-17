@@ -23,12 +23,17 @@ const detailStatus = document.getElementById("detailStatus");
 const detailLocation = document.getElementById("detailLocation");
 const detailUrgency = document.getElementById("detailUrgency");
 const syncSeaceButton = document.getElementById('syncSeaceButton');
+const runAiAnalysisButton = document.getElementById("runAiAnalysisButton");
+const aiAnalysisList = document.getElementById("aiAnalysisList");
+const aiStatusText = document.getElementById("aiStatusText");
+const aiQuotaTag = document.getElementById("aiQuotaTag");
 
 let allOpportunities = [];
 let currentPage = 1;
 const itemsPerPage = 15;
 let lastFilteredCount = 0;
 let profileKeywords = { preferred: [], excluded: [] };
+let currentDetailOpportunityId = null;
 
 function handleOAuthRedirect() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -413,7 +418,9 @@ if (document.getElementById('trackingBoard')) {
 async function loadTrackingBoard() {
   try {
     // Cargar todas las oportunidades
-    const response = await fetch(`${API_BASE}/api/opportunities`);
+    const response = await fetch(`${API_BASE}/api/opportunities`, {
+      headers: getAuthHeaders()
+    });
     const data = await response.json().catch(() => []);
     const allOpportunities = Array.isArray(data) ? data : [];
 
@@ -692,7 +699,9 @@ async function loadOpportunities() {
     // Cargar perfil con keywords
     await loadProfile();
 
-    const response = await fetch(`${API_BASE}/api/opportunities`);
+    const response = await fetch(`${API_BASE}/api/opportunities`, {
+      headers: getAuthHeaders()
+    });
     const data = await response.json().catch(() => []);
 
     if (!response.ok) {
@@ -876,10 +885,14 @@ async function loadOpportunityDetail() {
     return;
   }
 
+  currentDetailOpportunityId = opportunityId;
+
   try {
     setMessage("Consultando detalle de la oportunidad...");
 
-    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}`);
+    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}`, {
+      headers: getAuthHeaders()
+    });
     const data = await response.json().catch(() => null);
 
     if (!response.ok || !data) {
@@ -887,10 +900,144 @@ async function loadOpportunityDetail() {
     }
 
     renderOpportunityDetail(data);
+    await loadAiAnalysisStatus(opportunityId);
     setMessage(`Detalle cargado: ${data.processCode}.`);
   } catch (error) {
     setMessage("No fue posible cargar el detalle desde la API.");
   }
+}
+
+if (runAiAnalysisButton) {
+  runAiAnalysisButton.addEventListener("click", async () => {
+    if (!currentDetailOpportunityId) {
+      return;
+    }
+
+    await requestAiAnalysis(currentDetailOpportunityId);
+  });
+}
+
+async function loadAiAnalysisStatus(opportunityId) {
+  if (!aiAnalysisList || !aiStatusText) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}/ai-analysis`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data) {
+      throw new Error("No se pudo consultar el estado IA.");
+    }
+
+    updateAiQuota(data);
+
+    if (data.analysis) {
+      renderAiAnalysis(data.analysis);
+      aiStatusText.textContent = "Analisis IA guardado. No consume cupo al volver a abrir esta oportunidad.";
+      return;
+    }
+
+    if (!data.configured) {
+      aiStatusText.textContent = "Gemini no esta configurado. La recomendacion basica sigue funcionando sin costo.";
+      if (runAiAnalysisButton) runAiAnalysisButton.disabled = true;
+      return;
+    }
+
+    if (data.remainingToday <= 0) {
+      aiStatusText.textContent = "Limite diario de IA alcanzado. La recomendacion basica sigue disponible.";
+      if (runAiAnalysisButton) runAiAnalysisButton.disabled = true;
+      return;
+    }
+
+    aiStatusText.textContent = "Gemini esta disponible para generar un analisis avanzado de esta oportunidad.";
+    if (runAiAnalysisButton) runAiAnalysisButton.disabled = false;
+  } catch (error) {
+    aiStatusText.textContent = "No se pudo consultar el estado de IA. Verifica la migracion de base de datos.";
+    if (runAiAnalysisButton) runAiAnalysisButton.disabled = true;
+  }
+}
+
+async function requestAiAnalysis(opportunityId) {
+  if (!runAiAnalysisButton || !aiStatusText) {
+    return;
+  }
+
+  let keepDisabled = false;
+  try {
+    runAiAnalysisButton.disabled = true;
+    runAiAnalysisButton.textContent = "Analizando...";
+    aiStatusText.textContent = "Gemini esta analizando la oportunidad. Esto puede tardar unos segundos.";
+
+    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}/ai-analysis`, {
+      method: "POST",
+      headers: getAuthHeaders()
+    });
+    const data = await response.json().catch(() => null);
+
+    if (response.status === 429) {
+      aiStatusText.textContent = data?.message || "Limite diario de IA alcanzado.";
+      updateAiQuota(data || {});
+      keepDisabled = true;
+      return;
+    }
+
+    if (!response.ok || !data?.analysis) {
+      throw new Error(data?.message || data?.detail || "No se pudo generar el analisis IA.");
+    }
+
+    updateAiQuota(data);
+    renderAiAnalysis(data.analysis);
+    aiStatusText.textContent = data.fromCache
+      ? "Analisis IA recuperado desde cache."
+      : "Analisis IA generado y guardado correctamente.";
+  } catch (error) {
+    aiStatusText.textContent = error.message || "No se pudo generar el analisis IA.";
+  } finally {
+    runAiAnalysisButton.textContent = "Analizar con IA";
+    runAiAnalysisButton.disabled = keepDisabled;
+  }
+}
+
+function updateAiQuota(data) {
+  if (!aiQuotaTag) {
+    return;
+  }
+
+  if (typeof data.remainingToday === "number" && typeof data.dailyLimit === "number") {
+    aiQuotaTag.textContent = `${data.remainingToday}/${data.dailyLimit} disponibles`;
+    return;
+  }
+
+  aiQuotaTag.textContent = "IA opcional";
+}
+
+function renderAiAnalysis(analysis) {
+  if (!aiAnalysisList) {
+    return;
+  }
+
+  aiAnalysisList.innerHTML = `
+    ${createAiAnalysisItem(1, "Decision sugerida", analysis.recommendation)}
+    ${createAiAnalysisItem(2, "Resumen IA", analysis.summary)}
+    ${createAiAnalysisItem(3, "Riesgos", analysis.risks)}
+    ${createAiAnalysisItem(4, "Requisitos a revisar", analysis.requirements)}
+    ${createAiAnalysisItem(5, "Siguientes pasos", analysis.nextSteps)}
+  `;
+}
+
+function createAiAnalysisItem(number, title, text) {
+  return `
+    <div class="check-item">
+      <span class="check-mark">${number}</span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <p>${escapeHtml(text || "Sin informacion disponible.")}</p>
+      </div>
+    </div>
+  `;
 }
 
 function updateOpportunitySummary() {
@@ -1089,7 +1236,7 @@ function renderOpportunityDetail(item) {
   }
 
   if (detailInsightTitle) {
-    detailInsightTitle.textContent = getInsightTitle(item);
+    detailInsightTitle.textContent = item.recommendationLabel || getInsightTitle(item);
   }
 
   if (detailScore) {
@@ -1099,7 +1246,9 @@ function renderOpportunityDetail(item) {
   }
 
   if (detailSummary) {
-    detailSummary.textContent = item.summary;
+    detailSummary.textContent = item.recommendationReason
+      ? `${item.summary}\n\nAnalisis: ${item.recommendationReason}`
+      : item.summary;
   }
 
   if (detailEntity) {
@@ -1119,7 +1268,7 @@ function renderOpportunityDetail(item) {
   }
 
   if (detailStatus) {
-    detailStatus.textContent = item.isPriority ? "Prioridad alta" : "En revision";
+    detailStatus.textContent = item.priorityLevel || (item.isPriority ? "Prioridad alta" : "En revision");
   }
 
   if (detailLocation) {
@@ -1176,9 +1325,8 @@ function getUrgencyLabel(score) {
 
 function createOpportunityMarkup(item, index) {
   const scoreClass = getScoreClass(item.matchScore);
-  const statusChip = item.isPriority
-    ? '<span class="status active">Prioridad alta</span>'
-    : '<span class="status review">Revision pendiente</span>';
+  const recommendationLabel = item.recommendationLabel || (item.isPriority ? 'Prioridad alta' : 'Revision pendiente');
+  const statusChip = `<span class="status ${item.matchScore >= 80 ? 'active' : item.matchScore >= 40 ? 'review' : 'pending'}">${escapeHtml(recommendationLabel)}</span>`;
   const isFavorite = isOpportunityFavorite(item.opportunityId);
   const favoriteClass = isFavorite ? 'active' : '';
   const isUrgent = isOpportunityUrgent(item.closingDate);
@@ -1187,6 +1335,11 @@ function createOpportunityMarkup(item, index) {
     : '';
   const trackingStatus = getOpportunityTrackingStatus(item.opportunityId);
   const trackingStatusClass = getTrackingStatusClass(trackingStatus);
+  const matchedKeywords = Array.isArray(item.matchedKeywords) ? item.matchedKeywords : [];
+  const keywordChips = matchedKeywords.slice(0, 4).map(keyword =>
+    `<span class="recommendation-keyword">${escapeHtml(keyword)}</span>`
+  ).join('');
+  const recommendationReason = item.recommendationReason || 'Recomendacion calculada con tus palabras clave y preferencias.';
 
   // Calcular número correlativo
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1220,7 +1373,17 @@ function createOpportunityMarkup(item, index) {
         <div><span>Modalidad</span><strong>${escapeHtml(item.modality)}</strong></div>
       </div>
       <div class="result-foot">
-        <p class="help-copy">${highlightKeywords(item.summary, profileKeywords.preferred)}</p>
+        <div class="result-analysis">
+          <p class="help-copy">${highlightKeywords(item.summary, profileKeywords.preferred)}</p>
+          <div class="recommendation-box">
+            <div class="recommendation-heading">
+              <strong>${escapeHtml(recommendationLabel)}</strong>
+              <span>${item.matchScore}% afinidad</span>
+            </div>
+            <p>${escapeHtml(recommendationReason)}</p>
+            ${keywordChips ? `<div class="recommendation-keywords">${keywordChips}</div>` : ''}
+          </div>
+        </div>
         <div class="inline-actions">
           ${urgencyChip}
           <select class="tracking-status-select ${trackingStatusClass}" data-opportunity-id="${item.opportunityId}" aria-label="Estado de seguimiento">

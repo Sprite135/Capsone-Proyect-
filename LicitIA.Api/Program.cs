@@ -58,6 +58,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection("GoogleAuth"));
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<SqlConnectionFactory>();
@@ -72,8 +73,10 @@ builder.Services.AddSingleton<AlertRepository>();
 builder.Services.AddSingleton<AlertService>();
 builder.Services.AddSingleton<AlertSchedulerService>();
 builder.Services.AddSingleton<NotificationRepository>();
+builder.Services.AddSingleton<OpportunityAiAnalysisRepository>();
 builder.Services.AddHttpClient<OeceDataService>();
 builder.Services.AddHttpClient<OeceApiService>();
+builder.Services.AddHttpClient<GeminiAnalysisService>();
 
 // Add Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -177,6 +180,9 @@ app.MapGet("/api/health", () => Results.Ok(new
 
 app.MapGet("/api/opportunities", async (
     OpportunityRepository repository,
+    AffinityService affinityService,
+    HttpContext httpContext,
+    IOptions<JwtOptions> jwtOptions,
     CancellationToken cancellationToken,
     [FromQuery] int? days = null) =>
 {
@@ -191,7 +197,15 @@ app.MapGet("/api/opportunities", async (
             opportunities = opportunities.Where(o => o.PublishedDate.HasValue && o.PublishedDate >= cutoffDate).ToList();
         }
         
-        return Results.Ok(opportunities.Select(OpportunityResponse.FromModel));
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        var response = new List<OpportunityResponse>();
+        foreach (var opportunity in opportunities)
+        {
+            var analysis = await affinityService.AnalyzeOpportunityAsync(opportunity, userId, cancellationToken);
+            response.Add(OpportunityResponse.FromModel(opportunity, analysis));
+        }
+
+        return Results.Ok(response.OrderByDescending(item => item.MatchScore));
     }
     catch (SqlException)
     {
@@ -209,15 +223,26 @@ app.MapGet("/api/opportunities", async (
     }
 });
 
-app.MapGet("/api/opportunities/{id:int}", async (int id, OpportunityRepository repository, CancellationToken cancellationToken) =>
+app.MapGet("/api/opportunities/{id:int}", async (
+    int id,
+    OpportunityRepository repository,
+    AffinityService affinityService,
+    HttpContext httpContext,
+    IOptions<JwtOptions> jwtOptions,
+    CancellationToken cancellationToken) =>
 {
     try
     {
         var opportunity = await repository.GetByIdAsync(id, cancellationToken);
 
-        return opportunity is null
-            ? Results.NotFound(new { message = "No se encontro la oportunidad solicitada." })
-            : Results.Ok(OpportunityResponse.FromModel(opportunity));
+        if (opportunity is null)
+        {
+            return Results.NotFound(new { message = "No se encontro la oportunidad solicitada." });
+        }
+
+        var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+        var analysis = await affinityService.AnalyzeOpportunityAsync(opportunity, userId, cancellationToken);
+        return Results.Ok(OpportunityResponse.FromModel(opportunity, analysis));
     }
     catch (SqlException)
     {
@@ -232,6 +257,138 @@ app.MapGet("/api/opportunities/{id:int}", async (int id, OpportunityRepository r
             title: "No se pudo obtener el detalle.",
             detail: "Ocurrio un error inesperado al consultar la API.",
             statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+app.MapGet("/api/opportunities/{id:int}/ai-analysis", async (
+    int id,
+    OpportunityAiAnalysisRepository analysisRepository,
+    GeminiAnalysisService geminiService,
+    HttpContext httpContext,
+    IOptions<JwtOptions> jwtOptions,
+    CancellationToken cancellationToken) =>
+{
+    var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+    if (!userId.HasValue)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var cached = await analysisRepository.GetByUserAndOpportunityAsync(userId.Value, id, cancellationToken);
+        var usedToday = await analysisRepository.CountCreatedTodayAsync(userId.Value, cancellationToken);
+        var dailyLimit = geminiService.DailyLimitPerUser;
+
+        return Results.Ok(new
+        {
+            configured = geminiService.IsConfigured,
+            dailyLimit,
+            usedToday,
+            remainingToday = Math.Max(0, dailyLimit - usedToday),
+            analysis = cached
+        });
+    }
+    catch (SqlException)
+    {
+        return Results.Problem(
+            title: "No se pudo consultar el analisis IA.",
+            detail: "Ejecuta database/migration_add_opportunity_ai_analysis.sql para crear la tabla requerida.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+app.MapPost("/api/opportunities/{id:int}/ai-analysis", async (
+    int id,
+    OpportunityRepository opportunityRepository,
+    OpportunityAiAnalysisRepository analysisRepository,
+    AffinityService affinityService,
+    GeminiAnalysisService geminiService,
+    HttpContext httpContext,
+    IOptions<JwtOptions> jwtOptions,
+    CancellationToken cancellationToken,
+    [FromQuery] bool force = false) =>
+{
+    var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+    if (!userId.HasValue)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!geminiService.IsConfigured)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Gemini no esta configurado. Agrega Gemini:ApiKey en appsettings.json o como variable de entorno."
+        });
+    }
+
+    try
+    {
+        var opportunity = await opportunityRepository.GetByIdAsync(id, cancellationToken);
+        if (opportunity is null)
+        {
+            return Results.NotFound(new { message = "No se encontro la oportunidad solicitada." });
+        }
+
+        if (!force)
+        {
+            var cached = await analysisRepository.GetByUserAndOpportunityAsync(userId.Value, id, cancellationToken);
+            if (cached is not null)
+            {
+                var cachedUsedToday = await analysisRepository.CountCreatedTodayAsync(userId.Value, cancellationToken);
+                return Results.Ok(new
+                {
+                    fromCache = true,
+                    dailyLimit = geminiService.DailyLimitPerUser,
+                    usedToday = cachedUsedToday,
+                    remainingToday = Math.Max(0, geminiService.DailyLimitPerUser - cachedUsedToday),
+                    analysis = cached
+                });
+            }
+        }
+
+        var used = await analysisRepository.CountCreatedTodayAsync(userId.Value, cancellationToken);
+        if (used >= geminiService.DailyLimitPerUser)
+        {
+            return Results.Json(new
+            {
+                message = "Limite diario de IA alcanzado. La recomendacion basica sigue disponible.",
+                dailyLimit = geminiService.DailyLimitPerUser,
+                usedToday = used,
+                remainingToday = 0
+            }, statusCode: StatusCodes.Status429TooManyRequests);
+        }
+
+        var recommendation = await affinityService.AnalyzeOpportunityAsync(opportunity, userId.Value, cancellationToken);
+        var analysis = await geminiService.AnalyzeAsync(userId.Value, opportunity, recommendation, cancellationToken);
+        await analysisRepository.UpsertAsync(analysis, cancellationToken);
+
+        var updated = await analysisRepository.GetByUserAndOpportunityAsync(userId.Value, id, cancellationToken) ?? analysis;
+        var usedToday = await analysisRepository.CountCreatedTodayAsync(userId.Value, cancellationToken);
+
+        return Results.Ok(new
+        {
+            fromCache = false,
+            dailyLimit = geminiService.DailyLimitPerUser,
+            usedToday,
+            remainingToday = Math.Max(0, geminiService.DailyLimitPerUser - usedToday),
+            analysis = updated
+        });
+    }
+    catch (SqlException)
+    {
+        return Results.Problem(
+            title: "No se pudo guardar el analisis IA.",
+            detail: "Ejecuta database/migration_add_opportunity_ai_analysis.sql para crear la tabla requerida.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(
+            title: "No se pudo completar el analisis con Gemini.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
     }
 });
 
@@ -838,6 +995,7 @@ app.MapPost("/api/seace/refresh", async (
                     Category = scraped.Category,
                     Modality = scraped.Modality,
                     MatchScore = scraped.MatchScore,
+                    MatchedKeywordsCount = scraped.MatchedKeywordsCount,
                     Summary = scraped.Description,
                     Location = scraped.Location,
                     IsPriority = scraped.MatchScore >= 85,

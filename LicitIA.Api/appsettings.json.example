@@ -28,5 +28,10 @@
     "SmtpPassword": "YOUR_APP_PASSWORD",
     "FromEmail": "your-email@gmail.com",
     "FromName": "LicitIA"
+  },
+  "Gemini": {
+    "ApiKey": "",
+    "Model": "gemini-2.5-flash-lite",
+    "DailyLimitPerUser": 5
   }
 }
