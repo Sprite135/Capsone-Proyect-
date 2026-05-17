@@ -43,6 +43,19 @@ public sealed class OpportunityResponse
 
     public IReadOnlyList<string> ExcludedKeywords { get; init; } = Array.Empty<string>();
 
+    public string SelectionType { get; init; } = string.Empty;
+    public string ConvocationNumber { get; init; } = string.Empty;
+    public string ApplicableRegulation { get; init; } = string.Empty;
+    public string SeaceVersion { get; init; } = string.Empty;
+    public string EntityLegalAddress { get; init; } = string.Empty;
+    public string EntityWebsite { get; init; } = string.Empty;
+    public string EntityPhone { get; init; } = string.Empty;
+    public string ContractObject { get; init; } = string.Empty;
+    public string ParticipationCost { get; init; } = string.Empty;
+    public string BasesReproductionCost { get; init; } = string.Empty;
+    public string SeaceDetailJson { get; init; } = string.Empty;
+    public string SeaceScheduleJson { get; init; } = string.Empty;
+
     public static OpportunityResponse FromModel(Opportunity opportunity) =>
         new()
         {
@@ -60,6 +73,18 @@ public sealed class OpportunityResponse
             IsPriority = opportunity.IsPriority,
             PublishedDate = opportunity.PublishedDate,
             MatchedKeywordsCount = opportunity.MatchedKeywordsCount,
+            SelectionType = opportunity.SelectionType,
+            ConvocationNumber = opportunity.ConvocationNumber,
+            ApplicableRegulation = opportunity.ApplicableRegulation,
+            SeaceVersion = opportunity.SeaceVersion,
+            EntityLegalAddress = opportunity.EntityLegalAddress,
+            EntityWebsite = opportunity.EntityWebsite,
+            EntityPhone = opportunity.EntityPhone,
+            ContractObject = opportunity.ContractObject,
+            ParticipationCost = opportunity.ParticipationCost,
+            BasesReproductionCost = opportunity.BasesReproductionCost,
+            SeaceDetailJson = opportunity.SeaceDetailJson,
+            SeaceScheduleJson = opportunity.SeaceScheduleJson,
             RecommendationLabel = opportunity.MatchScore >= 80 ? "Alta prioridad" :
                 opportunity.MatchScore >= 60 ? "Recomendada" :
                 opportunity.MatchScore >= 40 ? "Revisar" : "Baja afinidad",
@@ -86,6 +111,18 @@ public sealed class OpportunityResponse
             IsPriority = analysis.Score >= 80,
             PublishedDate = opportunity.PublishedDate,
             MatchedKeywordsCount = analysis.MatchedKeywords.Count,
+            SelectionType = opportunity.SelectionType,
+            ConvocationNumber = opportunity.ConvocationNumber,
+            ApplicableRegulation = opportunity.ApplicableRegulation,
+            SeaceVersion = opportunity.SeaceVersion,
+            EntityLegalAddress = opportunity.EntityLegalAddress,
+            EntityWebsite = opportunity.EntityWebsite,
+            EntityPhone = opportunity.EntityPhone,
+            ContractObject = opportunity.ContractObject,
+            ParticipationCost = opportunity.ParticipationCost,
+            BasesReproductionCost = opportunity.BasesReproductionCost,
+            SeaceDetailJson = opportunity.SeaceDetailJson,
+            SeaceScheduleJson = opportunity.SeaceScheduleJson,
             RecommendationLabel = analysis.Label,
             RecommendationReason = analysis.Reason,
             PriorityLevel = analysis.PriorityLevel,

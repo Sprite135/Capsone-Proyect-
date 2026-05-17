@@ -1000,7 +1000,19 @@ app.MapPost("/api/seace/refresh", async (
                     Location = scraped.Location,
                     IsPriority = scraped.MatchScore >= 85,
                     PublishedDate = scraped.PublishedDate,
-                    SeaceIndex = i + 1
+                    SeaceIndex = i + 1,
+                    SelectionType = scraped.SelectionType,
+                    ConvocationNumber = scraped.ConvocationNumber,
+                    ApplicableRegulation = scraped.ApplicableRegulation,
+                    SeaceVersion = scraped.SeaceVersion,
+                    EntityLegalAddress = scraped.EntityLegalAddress,
+                    EntityWebsite = scraped.EntityWebsite,
+                    EntityPhone = scraped.EntityPhone,
+                    ContractObject = scraped.ContractObject,
+                    ParticipationCost = scraped.ParticipationCost,
+                    BasesReproductionCost = scraped.BasesReproductionCost,
+                    SeaceDetailJson = scraped.SeaceDetailJson,
+                    SeaceScheduleJson = scraped.SeaceScheduleJson
                 };
                 await repository.InsertOpportunityAsync(opportunity, cancellationToken);
                 savedCount++;

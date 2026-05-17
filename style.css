@@ -2054,15 +2054,76 @@ td,
   gap: 12px;
 }
 
+.seace-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
 .result-meta {
   grid-template-columns: repeat(3, 1fr);
   margin-top: 14px;
 }
 
 .result-meta div,
-.detail-meta div {
+.detail-meta div,
+.seace-detail-grid div {
   display: grid;
   gap: 4px;
+}
+
+.seace-detail-grid div {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(15, 27, 46, 0.72);
+}
+
+.seace-detail-grid span,
+.schedule-item span,
+.schedule-empty {
+  color: var(--muted);
+}
+
+.schedule-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.seace-field-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.schedule-item,
+.seace-field-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(15, 27, 46, 0.72);
+}
+
+.schedule-item strong,
+.seace-field-item strong {
+  color: var(--text);
+}
+
+.seace-field-item span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.schedule-empty {
+  padding: 12px 0;
 }
 
 .result-top {
@@ -2494,6 +2555,8 @@ button:disabled,
 
   .result-meta,
   .detail-meta,
+  .seace-detail-grid,
+  .seace-field-list,
   .mini-stats,
   .builder-grid {
     grid-template-columns: 1fr;

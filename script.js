@@ -22,6 +22,15 @@ const detailModality = document.getElementById("detailModality");
 const detailStatus = document.getElementById("detailStatus");
 const detailLocation = document.getElementById("detailLocation");
 const detailUrgency = document.getElementById("detailUrgency");
+const detailContractObject = document.getElementById("detailContractObject");
+const detailConvocationNumber = document.getElementById("detailConvocationNumber");
+const detailSelectionType = document.getElementById("detailSelectionType");
+const detailRegulation = document.getElementById("detailRegulation");
+const detailLegalAddress = document.getElementById("detailLegalAddress");
+const detailEntityPhone = document.getElementById("detailEntityPhone");
+const detailBasesCost = document.getElementById("detailBasesCost");
+const detailScheduleList = document.getElementById("detailScheduleList");
+const detailSeaceFields = document.getElementById("detailSeaceFields");
 const syncSeaceButton = document.getElementById('syncSeaceButton');
 const runAiAnalysisButton = document.getElementById("runAiAnalysisButton");
 const aiAnalysisList = document.getElementById("aiAnalysisList");
@@ -32,7 +41,7 @@ let allOpportunities = [];
 let currentPage = 1;
 const itemsPerPage = 15;
 let lastFilteredCount = 0;
-let profileKeywords = { preferred: [], excluded: [] };
+let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "" };
 let currentDetailOpportunityId = null;
 
 function handleOAuthRedirect() {
@@ -667,6 +676,7 @@ async function loadProfile() {
       const profile = await response.json();
       profileKeywords.preferred = profile.preferredKeywords || [];
       profileKeywords.excluded = profile.excludedKeywords || [];
+      profileKeywords.seaceObjectDescription = profile.seaceObjectDescription || "";
       console.log('Profile loaded:', profileKeywords);
     }
   } catch (error) {
@@ -1080,19 +1090,13 @@ function renderOpportunities() {
     const matchesFavorite =
       favoriteFilter === "all" || (favoriteFilter === "only" && isOpportunityFavorite(item.opportunityId));
     const matchesAmount = item.estimatedAmount >= minAmount && item.estimatedAmount <= maxAmount;
-    const haystack = `${item.processCode} ${item.title} ${item.entityName} ${item.category} ${item.modality} ${item.summary || ''}`.toLowerCase();
+    const haystack = buildOpportunitySearchText(item);
     const matchesSearch = !searchTerm || haystack.includes(searchTerm);
-
-    // Filtrar por keywords del perfil
-    const matchesPreferredKeywords = profileKeywords.preferred.length === 0 || 
-      profileKeywords.preferred.some(keyword => haystack.includes(keyword.toLowerCase()));
-    const matchesExcludedKeywords = profileKeywords.excluded.length === 0 || 
-      !profileKeywords.excluded.some(keyword => haystack.includes(keyword.toLowerCase()));
-
-    // Debug: log primer item que no pasa el filtro de keywords
-    if (!matchesPreferredKeywords && profileKeywords.preferred.length > 0) {
-      console.log('Filtered out (no preferred match):', item.title, 'Keywords:', profileKeywords.preferred, 'Haystack:', haystack);
-    }
+    const matchesPreferredKeywords = profileKeywords.preferred.length === 0 ||
+      profileKeywords.preferred.some(keyword => matchesKeyword(haystack, keyword)) ||
+      profileKeywords.preferred.some(keyword => matchesKeyword(profileKeywords.seaceObjectDescription, keyword));
+    const matchesExcludedKeywords = profileKeywords.excluded.length === 0 ||
+      !profileKeywords.excluded.some(keyword => matchesKeyword(haystack, keyword));
 
     return matchesCategory && matchesLocation && matchesFavorite && matchesAmount && matchesSearch && matchesPreferredKeywords && matchesExcludedKeywords;
   });
@@ -1128,6 +1132,42 @@ function renderOpportunities() {
 
   // Add pagination controls
   renderPaginationControls(totalPages);
+}
+
+function buildOpportunitySearchText(item) {
+  return [
+    item.processCode,
+    item.title,
+    item.entityName,
+    item.category,
+    item.modality,
+    item.summary,
+    item.contractObject,
+    item.selectionType,
+    item.applicableRegulation,
+    item.entityLegalAddress,
+    item.entityWebsite,
+    item.entityPhone,
+    item.seaceDetailJson
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function normalizeKeywordText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function matchesKeyword(haystack, keyword) {
+  const rawKeyword = String(keyword || "").trim().toLowerCase();
+  if (!rawKeyword) {
+    return true;
+  }
+
+  return haystack.includes(rawKeyword) ||
+    normalizeKeywordText(haystack).includes(normalizeKeywordText(rawKeyword));
 }
 
 function renderPaginationControls(totalPages) {
@@ -1279,7 +1319,77 @@ function renderOpportunityDetail(item) {
     detailUrgency.textContent = getUrgencyLabel(item.matchScore);
   }
 
+  setText(detailContractObject, item.contractObject || item.category || "No disponible");
+  setText(detailConvocationNumber, item.convocationNumber || "No disponible");
+  setText(detailSelectionType, item.selectionType || item.modality || "No disponible");
+  setText(detailRegulation, item.applicableRegulation || "No disponible");
+  setText(detailLegalAddress, item.entityLegalAddress || "No disponible");
+  setText(detailEntityPhone, item.entityPhone || "No disponible");
+  setText(detailBasesCost, item.basesReproductionCost || item.participationCost || "No disponible");
+  renderSeaceSchedule(item.seaceScheduleJson);
+  renderSeaceFields(item.seaceDetailJson);
+
   document.title = `LicitIA | ${item.processCode}`;
+}
+
+function setText(element, value) {
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function renderSeaceSchedule(scheduleJson) {
+  if (!detailScheduleList) {
+    return;
+  }
+
+  let schedule = [];
+  try {
+    schedule = scheduleJson ? JSON.parse(scheduleJson) : [];
+  } catch {
+    schedule = [];
+  }
+
+  if (!Array.isArray(schedule) || schedule.length === 0) {
+    detailScheduleList.innerHTML = '<div class="schedule-empty">Sin cronograma disponible</div>';
+    return;
+  }
+
+  detailScheduleList.innerHTML = schedule.map(item => `
+    <div class="schedule-item">
+      <strong>${escapeHtml(item.etapa || "Etapa")}</strong>
+      <span>${escapeHtml(item.fechaInicio || "Sin inicio")} - ${escapeHtml(item.fechaFin || "Sin fin")}</span>
+    </div>
+  `).join("");
+}
+
+function renderSeaceFields(detailJson) {
+  if (!detailSeaceFields) {
+    return;
+  }
+
+  let details = {};
+  try {
+    details = detailJson ? JSON.parse(detailJson) : {};
+  } catch {
+    details = {};
+  }
+
+  const entries = Object.entries(details)
+    .filter(([key, value]) => key && value)
+    .slice(0, 30);
+
+  if (entries.length === 0) {
+    detailSeaceFields.innerHTML = '<div class="schedule-empty">Sin ficha SEACE disponible</div>';
+    return;
+  }
+
+  detailSeaceFields.innerHTML = entries.map(([key, value]) => `
+    <div class="seace-field-item">
+      <span>${escapeHtml(key)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `).join("");
 }
 
 function getActiveFilterValue(groupName) {

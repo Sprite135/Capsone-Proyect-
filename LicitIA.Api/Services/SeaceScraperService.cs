@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using HtmlAgilityPack;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 [assembly: InternalsVisibleTo("LicitIA.Tests")]
 
@@ -190,13 +191,15 @@ public class SeaceScraperService
                         if (rows.Count > 0)
                         {
                             int count = 0;
-                            // Saltar la primera fila (encabezado)
-                            foreach (var row in rows.Skip(1))
+                            var dataRows = rows.Skip(1).ToList();
+                            var firstRowIndexOnPage = await GetFirstVisibleResultRowIndexAsync(page);
+                            for (int rowIndex = 0; rowIndex < dataRows.Count; rowIndex++)
                             {
                                 if (opportunities.Count >= maxResults) break;
 
                                 try
                                 {
+                                    var row = dataRows[rowIndex];
                                     var cells = await row.QuerySelectorAllAsync("td");
                                     if (cells.Count >= 6)
                                     {
@@ -223,7 +226,9 @@ public class SeaceScraperService
                                             Category = cellData[5],
                                             Description = cellData[6],
                                             EstimatedAmount = ParseSeaceAmount(cellData[9]),
-                                            ClosingDate = publishedDate?.AddDays(30) ?? DateTime.Now.AddDays(30)
+                                            ClosingDate = publishedDate?.AddDays(30) ?? DateTime.Now.AddDays(30),
+                                            SeaceDetailButtonId = await GetDetailButtonIdAsync(row),
+                                            SeaceRowIndex = firstRowIndexOnPage + rowIndex
                                         };
 
                                         // Usar nomenclatura como process code
@@ -241,11 +246,25 @@ public class SeaceScraperService
                                         count++;
 
                                         Console.WriteLine($"[SeaceScraper] {cellData[1]} - {cellData[2]} - {cellData[3]}");
+
                                     }
                                 }
-                                catch
+                                catch (Exception ex)
                                 {
-                                    // Error al procesar fila, continuar
+                                    Console.WriteLine($"[SeaceScraper] Error procesando fila {rowIndex}: {ex.Message}");
+                                }
+                            }
+
+                            var pageOpportunities = opportunities.Skip(opportunities.Count - count).ToList();
+                            for (int detailIndex = 0; detailIndex < pageOpportunities.Count; detailIndex++)
+                            {
+                                try
+                                {
+                                    await OpenDetailAndReturnAsync(page, detailIndex, pageOpportunities[detailIndex]);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"[SeaceScraper] Error abriendo detalle de fila {detailIndex}: {ex.Message}");
                                 }
                             }
 
@@ -413,6 +432,551 @@ public class SeaceScraperService
             Console.WriteLine($"[SeaceScraper] Error en Playwright: {ex.Message}");
             return new List<ScrapedOpportunity>();
         }
+    }
+
+    private async Task OpenDetailAndReturnAsync(IPage page, int rowIndex, ScrapedOpportunity opportunity)
+    {
+        Console.WriteLine($"[SeaceScraper] Abriendo detalle de fila {rowIndex}: {opportunity.ProcessCode}...");
+
+        var effectiveRowIndex = opportunity.SeaceRowIndex > 0 ? opportunity.SeaceRowIndex : rowIndex;
+        var detailSelector = $"#tbBuscador\\:idFormBuscarProceso\\:dtProcesos\\:{effectiveRowIndex}\\:j_idt377";
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(opportunity.SeaceDetailButtonId))
+            {
+                var clickedStoredButton = await page.EvaluateAsync<bool>(
+                    @"(buttonId) => {
+                        const button = document.getElementById(buttonId);
+                        if (!button) return false;
+                        button.click();
+                        return true;
+                    }",
+                    opportunity.SeaceDetailButtonId);
+
+                if (clickedStoredButton)
+                {
+                    Console.WriteLine($"[SeaceScraper] Detalle abierto con boton capturado: {opportunity.SeaceDetailButtonId}");
+                    await WaitForDetailAndExtractAsync(page, rowIndex, opportunity);
+                    return;
+                }
+            }
+
+            var clicked = await page.EvaluateAsync<bool>(
+                @"(args) => {
+                    const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
+                    const processCode = normalize(args.processCode);
+                    const title = normalize(args.title);
+                    const rowsRoot = document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_data');
+                    const rows = rowsRoot ? Array.from(rowsRoot.querySelectorAll('tr')) : [];
+                    const row = rows.find(current => {
+                        const text = normalize(current.textContent);
+                        return (processCode && text.includes(processCode)) ||
+                            (title && text.includes(title));
+                    });
+
+                    const findButton = root => {
+                        if (!root) return null;
+                        return root.querySelector('[id$="":j_idt377""]') ||
+                            Array.from(root.querySelectorAll('button, a, span.ui-button, input[type=""submit""]'))
+                                .find(el => normalize(el.textContent || el.value || el.title || el.getAttribute('aria-label')).length <= 40);
+                    };
+
+                    const button = findButton(row) ||
+                        document.getElementById(`tbBuscador:idFormBuscarProceso:dtProcesos:${args.effectiveRowIndex}:j_idt377`) ||
+                        document.getElementById(`tbBuscador:idFormBuscarProceso:dtProcesos:${args.rowIndex}:j_idt377`);
+
+                    if (!button) return false;
+                    button.click();
+                    return true;
+                }",
+                new { rowIndex, effectiveRowIndex, opportunity.ProcessCode, opportunity.Title });
+
+            if (!clicked)
+            {
+                await page.WaitForSelectorAsync(detailSelector, new PageWaitForSelectorOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = 10000
+                });
+                await page.ClickAsync(detailSelector);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo abrir detalle para {opportunity.ProcessCode}: {ex.Message}");
+            return;
+        }
+
+        await WaitForDetailAndExtractAsync(page, rowIndex, opportunity);
+    }
+
+    private async Task WaitForDetailAndExtractAsync(IPage page, int rowIndex, ScrapedOpportunity opportunity)
+    {
+        await page.WaitForSelectorAsync("#tbFicha\\:pnlContenedorGral", new PageWaitForSelectorOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        try
+        {
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const ficha = document.getElementById('tbFicha:pnlContenedorFicha1');
+                    return Boolean(ficha && ficha.textContent && ficha.textContent.includes('Nomenclatura'));
+                }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = 8000 });
+        }
+        catch (TimeoutException)
+        {
+            Console.WriteLine($"[SeaceScraper] Ficha1 no mostro Nomenclatura a tiempo en fila {rowIndex}; se intentara extraer igual.");
+        }
+
+        Console.WriteLine($"[SeaceScraper] Detalle de fila {rowIndex} abierto.");
+
+        await ExtractDetailFromPanelAsync(page, opportunity, rowIndex);
+
+        var returned = await page.EvaluateAsync<bool>(
+            @"() => {
+                const normalize = value => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                const textNode = Array.from(document.querySelectorAll('.ui-button-text.ui-c, button, a, input[type=""submit""]'))
+                    .find(el => {
+                        const text = normalize(el.textContent || el.value || el.title || el.getAttribute('aria-label'));
+                        return text === 'regresar' || text.includes('regresar');
+                    });
+                if (!textNode) return false;
+
+                const clickable = textNode.closest('button, a, .ui-button') || textNode;
+                clickable.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                clickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                clickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                clickable.click();
+                return true;
+            }");
+
+        if (!returned)
+        {
+            Console.WriteLine($"[SeaceScraper] No se encontro boton Regresar en detalle de fila {rowIndex}.");
+            return;
+        }
+
+        try
+        {
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const results = document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_data');
+                    const detail = document.getElementById('tbFicha:pnlContenedorGral');
+                    return Boolean(results && results.querySelector('tr')) && (!detail || detail.offsetParent === null);
+                }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = 15000 });
+        }
+        catch (TimeoutException)
+        {
+            Console.WriteLine($"[SeaceScraper] No se confirmo visualmente el regreso desde fila {rowIndex}; se continuara con la siguiente fila.");
+        }
+
+        await Task.Delay(800);
+        Console.WriteLine($"[SeaceScraper] Regreso a resultados desde fila {rowIndex}.");
+    }
+
+    private static async Task<string> GetDetailButtonIdAsync(IElementHandle row)
+    {
+        return await row.EvaluateAsync<string>(
+            @"row => {
+                const candidates = Array.from(row.querySelectorAll('[id], a, button, input[type=""submit""], span.ui-button'));
+                const withId = candidates.filter(el => el.id && el.id.includes('tbBuscador:idFormBuscarProceso:dtProcesos'));
+                const direct = withId.find(el => el.id.endsWith(':j_idt377'));
+                const action = withId.find(el => {
+                    const text = (el.textContent || el.value || el.title || el.getAttribute('aria-label') || '').toLowerCase();
+                    return text.includes('ver') || text.includes('detalle') || el.classList.contains('ui-button');
+                });
+                return (direct || action || withId[withId.length - 1] || {}).id || '';
+            }");
+    }
+
+    private static async Task<int> GetFirstVisibleResultRowIndexAsync(IPage page)
+    {
+        return await page.EvaluateAsync<int>(
+            @"() => {
+                const paginator = document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_paginator_bottom') ||
+                    document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_paginator_top');
+                const activePage = paginator?.querySelector('.ui-paginator-page.ui-state-active');
+                const rowsSelector = paginator?.querySelector('select.ui-paginator-rpp-options');
+                const pageNumber = parseInt(activePage?.textContent || '1', 10);
+                const rowsPerPage = parseInt(rowsSelector?.value || '15', 10);
+                return Math.max(0, (pageNumber - 1) * rowsPerPage);
+            }");
+    }
+
+    private async Task ExtractDetailFromPanelAsync(IPage page, ScrapedOpportunity opportunity, int rowIndex)
+    {
+        var fichaText = await page.EvaluateAsync<string>(
+            @"() => {
+                const root = document.getElementById('tbFicha:pnlContenedorFicha1');
+                return root ? (root.innerText || root.textContent || '') : '';
+            }");
+
+        var details = await page.EvaluateAsync<Dictionary<string, string>>(
+            @"() => {
+                const normalize = value => (value || '').replace(/\s+/g, ' ').replace(/:$/, '').trim();
+                const cleanCellText = cell => {
+                    const clone = cell.cloneNode(true);
+                    clone.querySelectorAll('script, style, table').forEach(node => node.remove());
+                    return normalize(clone.textContent || cell.textContent);
+                };
+                const normalizeKey = value => normalize(value)
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[°º]/g, '')
+                    .replace(/[^a-z0-9/ ]/g, '')
+                    .replace(/\s+/g, ' ');
+                const result = {};
+                const addPair = (key, value) => {
+                    key = normalize(key);
+                    value = normalize(value);
+                    if (!key || !value || key.length > 140) return;
+                    if (!result[key]) {
+                        result[key] = value;
+                        return;
+                    }
+
+                    let index = 2;
+                    while (result[`${key} ${index}`]) index++;
+                    result[`${key} ${index}`] = value;
+                };
+                const extractKnownLabelsFromText = root => {
+                    if (!root) return;
+                    const labels = [
+                        'Nomenclatura',
+                        'N° Convocatoria',
+                        'N Convocatoria',
+                        'Tipo Compra o Selección',
+                        'Tipo Compra o Seleccion',
+                        'Normativa Aplicable',
+                        'Versión SEACE',
+                        'Version SEACE',
+                        'Entidad Convocante',
+                        'Dirección Legal',
+                        'Direccion Legal',
+                        'Pagina Web',
+                        'Página Web',
+                        'Teléfono de la Entidad',
+                        'Telefono de la Entidad',
+                        'Objeto de Contratación',
+                        'Objeto de Contratacion',
+                        'Descripción del Objeto',
+                        'Descripcion del Objeto',
+                        'VR / VE / Cuantía de la contratación',
+                        'VR / VE / Cuantia de la contratacion',
+                        'Monto del Derecho de Participación',
+                        'Monto del Derecho de Participacion',
+                        'Monto del costo de Reproducción de las Bases',
+                        'Monto del costo de Reproduccion de las Bases',
+                        'Fecha y Hora Publicación',
+                        'Fecha y Hora Publicacion'
+                    ];
+                    const lines = normalize(root.innerText || root.textContent)
+                        .split(/(?=(?:Nomenclatura|N° Convocatoria|N Convocatoria|Tipo Compra|Normativa Aplicable|Versión SEACE|Version SEACE|Entidad Convocante|Dirección Legal|Direccion Legal|Página Web|Pagina Web|Teléfono de la Entidad|Telefono de la Entidad|Objeto de Contratación|Objeto de Contratacion|Descripción del Objeto|Descripcion del Objeto|VR \/ VE|Monto del Derecho|Monto del costo|Fecha y Hora))/)
+                        .map(line => normalize(line))
+                        .filter(Boolean);
+
+                    for (const line of lines) {
+                        const match = labels.find(label => normalizeKey(line).startsWith(normalizeKey(label)));
+                        if (!match) continue;
+                        const value = normalize(line.substring(match.length).replace(/^:/, ''));
+                        addPair(match, value);
+                    }
+                };
+                const extractRoot = root => {
+                    if (!root) return;
+
+                    root.querySelectorAll('tr').forEach(row => {
+                        const cells = Array.from(row.children).filter(cell =>
+                            ['TD', 'TH'].includes(cell.tagName));
+                        if (cells.length < 2) return;
+
+                        if (cells.length >= 4) {
+                            for (let index = 0; index < cells.length - 1; index += 2) {
+                                addPair(cleanCellText(cells[index]), cleanCellText(cells[index + 1]));
+                            }
+                        } else {
+                            addPair(cleanCellText(cells[0]), cells.slice(1).map(cleanCellText).join(' '));
+                        }
+                    });
+
+                    root.querySelectorAll('td, th, label, span').forEach(node => {
+                        const key = normalize(node.textContent);
+                        if (!key || !key.endsWith(':')) return;
+                        const next = node.nextElementSibling;
+                        if (next) addPair(key, next.textContent);
+                    });
+
+                    extractKnownLabelsFromText(root);
+                };
+
+                extractRoot(document.getElementById('tbFicha:pnlContenedorFicha1'));
+                if (Object.keys(result).length === 0) {
+                    const candidates = Array.from(document.querySelectorAll('div, fieldset, table'))
+                        .filter(node => {
+                            const text = normalize(node.textContent);
+                            return text.includes('Nomenclatura') &&
+                                text.includes('Entidad Convocante') &&
+                                text.includes('Descripcion del Objeto');
+                        });
+                    extractRoot(candidates[0]);
+                }
+                if (Object.keys(result).length === 0) {
+                    extractRoot(document.getElementById('tbFicha:pnlContenedorGral'));
+                }
+
+                const knownLabels = [
+                    'Nomenclatura',
+                    'N° Convocatoria',
+                    'N Convocatoria',
+                    'Tipo Compra o Selección',
+                    'Tipo Compra o Seleccion',
+                    'Normativa Aplicable',
+                    'Versión SEACE',
+                    'Version SEACE',
+                    'Entidad Convocante',
+                    'Dirección Legal',
+                    'Direccion Legal',
+                    'Pagina Web',
+                    'Página Web',
+                    'Teléfono de la Entidad',
+                    'Telefono de la Entidad',
+                    'Objeto de Contratación',
+                    'Objeto de Contratacion',
+                    'Descripción del Objeto',
+                    'Descripcion del Objeto',
+                    'VR / VE / Cuantía de la contratación',
+                    'VR / VE / Cuantia de la contratacion',
+                    'Monto del Derecho de Participación',
+                    'Monto del Derecho de Participacion',
+                    'Monto del costo de Reproducción de las Bases',
+                    'Monto del costo de Reproduccion de las Bases',
+                    'Fecha y Hora Publicación',
+                    'Fecha y Hora Publicacion'
+                ];
+                const wanted = new Map(knownLabels.map(label => [normalizeKey(label), label]));
+                document.querySelectorAll('td, th').forEach(cell => {
+                    const key = normalizeKey(cell.textContent);
+                    if (!wanted.has(key)) return;
+                    const row = cell.closest('tr');
+                    const cells = row ? Array.from(row.children).filter(item => ['TD', 'TH'].includes(item.tagName)) : [];
+                    const index = cells.indexOf(cell);
+                    const nextCell = index >= 0 ? cells[index + 1] : null;
+                    if (nextCell) {
+                        addPair(wanted.get(key), cleanCellText(nextCell));
+                    }
+                });
+
+                return result;
+            }");
+
+        if (details.Count == 0 && !string.IsNullOrWhiteSpace(fichaText))
+        {
+            details = ExtractDetailsFromFichaText(fichaText);
+        }
+
+        var scheduleJson = await page.EvaluateAsync<string>(
+            @"() => {
+                const root = document.getElementById('tbFicha:pnlContenedorFicha2') ||
+                    document.getElementById('tbFicha:pnlContenedorGral');
+                if (!root) return '';
+                const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
+                const tables = Array.from(root.querySelectorAll('table'));
+                const table = tables.find(current => {
+                    const text = normalize(current.textContent);
+                    return text.includes('Etapa') && text.includes('Fecha Inicio') && text.includes('Fecha Fin');
+                });
+                if (!table) return '';
+                const rows = Array.from(table.querySelectorAll('tr')).slice(1).map(row => {
+                    const cells = Array.from(row.querySelectorAll('td')).map(cell => normalize(cell.textContent));
+                    return cells.length >= 3 ? { etapa: cells[0], fechaInicio: cells[1], fechaFin: cells[2] } : null;
+                }).filter(Boolean);
+                return JSON.stringify(rows);
+            }");
+
+        ApplyDetailFields(opportunity, details, scheduleJson);
+        Console.WriteLine($"[SeaceScraper] Detalle extraido de fila {rowIndex}: {details.Count} campos. Texto ficha: {fichaText.Length} caracteres.");
+    }
+
+    private static Dictionary<string, string> ExtractDetailsFromFichaText(string fichaText)
+    {
+        var labels = new[]
+        {
+            "Nomenclatura",
+            "N° Convocatoria",
+            "N Convocatoria",
+            "Tipo Compra o Selección",
+            "Tipo Compra o Seleccion",
+            "Normativa Aplicable",
+            "Versión SEACE",
+            "Version SEACE",
+            "Entidad Convocante",
+            "Dirección Legal",
+            "Direccion Legal",
+            "Pagina Web",
+            "Página Web",
+            "Teléfono de la Entidad",
+            "Telefono de la Entidad",
+            "Objeto de Contratación",
+            "Objeto de Contratacion",
+            "Descripción del Objeto",
+            "Descripcion del Objeto",
+            "VR / VE / Cuantía de la contratación",
+            "VR / VE / Cuantia de la contratacion",
+            "Monto del Derecho de Participación",
+            "Monto del Derecho de Participacion",
+            "Monto del costo de Reproducción de las Bases",
+            "Monto del costo de Reproduccion de las Bases",
+            "Fecha y Hora Publicación",
+            "Fecha y Hora Publicacion"
+        };
+
+        var normalizedText = fichaText.Replace("\r", "\n");
+        foreach (var label in labels)
+        {
+            normalizedText = normalizedText.Replace(label + ":", "\n" + label + ":\n", StringComparison.OrdinalIgnoreCase);
+            normalizedText = normalizedText.Replace(label, "\n" + label + "\n", StringComparison.OrdinalIgnoreCase);
+        }
+
+        var lines = normalizedText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToList();
+
+        var details = new Dictionary<string, string>();
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var rawCurrent = lines[index].Trim();
+            var current = rawCurrent.TrimEnd(':');
+            var label = labels
+                .OrderByDescending(item => item.Length)
+                .FirstOrDefault(item =>
+                    string.Equals(NormalizeLabel(item), NormalizeLabel(current), StringComparison.OrdinalIgnoreCase) ||
+                    NormalizeLabel(rawCurrent).StartsWith(NormalizeLabel(item), StringComparison.OrdinalIgnoreCase));
+
+            if (label is null)
+            {
+                continue;
+            }
+
+            var value = rawCurrent.Length > label.Length
+                ? rawCurrent[label.Length..].Trim().TrimStart(':').Trim()
+                : string.Empty;
+
+            if (string.IsNullOrWhiteSpace(value) && index + 1 < lines.Count)
+            {
+                var valueIndex = index + 1;
+                while (valueIndex < lines.Count)
+                {
+                    var candidate = lines[valueIndex].Trim();
+                    var candidateIsLabel = labels.Any(item =>
+                        string.Equals(NormalizeLabel(item), NormalizeLabel(candidate.TrimEnd(':')), StringComparison.OrdinalIgnoreCase) ||
+                        NormalizeLabel(candidate).StartsWith(NormalizeLabel(item), StringComparison.OrdinalIgnoreCase));
+                    var candidateIsSectionHeader = NormalizeLabel(candidate).StartsWith("Informacion general", StringComparison.OrdinalIgnoreCase) ||
+                        NormalizeLabel(candidate).StartsWith("Informacion General", StringComparison.OrdinalIgnoreCase);
+
+                    if (!string.IsNullOrWhiteSpace(candidate) && candidate != ":" && !candidateIsLabel && !candidateIsSectionHeader)
+                    {
+                        value = candidate.Trim().TrimStart(':').Trim();
+                        break;
+                    }
+
+                    valueIndex++;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(value) && !details.ContainsKey(label))
+            {
+                details[label] = value;
+            }
+        }
+
+        return details;
+    }
+
+    private void ApplyDetailFields(ScrapedOpportunity opportunity, Dictionary<string, string> details, string scheduleJson)
+    {
+        opportunity.ProcessCode = ReadDetail(details, "Nomenclatura", opportunity.ProcessCode);
+        opportunity.ConvocationNumber = ReadDetail(details, "N Convocatoria", opportunity.ConvocationNumber);
+        opportunity.SelectionType = ReadDetail(details, "Tipo Compra", opportunity.SelectionType);
+        opportunity.ApplicableRegulation = ReadDetail(details, "Normativa Aplicable", opportunity.ApplicableRegulation);
+        opportunity.SeaceVersion = ReadDetail(details, "Version SEACE", opportunity.SeaceVersion);
+        opportunity.EntityLegalAddress = ReadDetail(details, "Direccion Legal", opportunity.EntityLegalAddress);
+        opportunity.EntityWebsite = ReadDetail(details, "Pagina Web", opportunity.EntityWebsite);
+        opportunity.EntityPhone = ReadDetail(details, "Telefono de la Entidad", opportunity.EntityPhone);
+        opportunity.ContractObject = ReadDetail(details, "Objeto de Contratacion", opportunity.ContractObject);
+        opportunity.ParticipationCost = ReadDetail(details, "Monto del Derecho de Participacion", opportunity.ParticipationCost);
+        opportunity.BasesReproductionCost = ReadDetail(details, "Monto del costo de Reproduccion de las Bases", opportunity.BasesReproductionCost);
+
+        var description = ReadDetail(details, "Descripcion del Objeto", string.Empty);
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            opportunity.Description = description;
+        }
+
+        var amountText = ReadDetail(details, "VR / VE / Cuantia", string.Empty);
+        var parsedAmount = ParseSeaceAmount(amountText.Replace("Soles", string.Empty, StringComparison.OrdinalIgnoreCase));
+        if (parsedAmount > 0)
+        {
+            opportunity.EstimatedAmount = parsedAmount;
+        }
+
+        opportunity.SeaceDetailJson = JsonSerializer.Serialize(details);
+        opportunity.SeaceScheduleJson = scheduleJson ?? string.Empty;
+    }
+
+    private static string ReadDetail(Dictionary<string, string> details, string label, string fallback)
+    {
+        var normalizedLabel = NormalizeLabel(label);
+        var match = details.FirstOrDefault(item =>
+            NormalizeLabel(item.Key).Contains(normalizedLabel, StringComparison.OrdinalIgnoreCase) ||
+            normalizedLabel.Contains(NormalizeLabel(item.Key), StringComparison.OrdinalIgnoreCase));
+
+        return string.IsNullOrWhiteSpace(match.Value) ? fallback : match.Value.Trim();
+    }
+
+    private static string NormalizeLabel(string value)
+    {
+        return value
+            .Replace("\u00f3", "o")
+            .Replace("\u00e9", "e")
+            .Replace("\u00e1", "a")
+            .Replace("\u00ed", "i")
+            .Replace("\u00fa", "u")
+            .Replace("\u00f1", "n")
+            .Replace("\u00d3", "O")
+            .Replace("\u00c9", "E")
+            .Replace("\u00c1", "A")
+            .Replace("\u00cd", "I")
+            .Replace("\u00da", "U")
+            .Replace("\u00d1", "N")
+            .Replace("ó", "o")
+            .Replace("é", "e")
+            .Replace("á", "a")
+            .Replace("í", "i")
+            .Replace("ú", "u")
+            .Replace("ñ", "n")
+            .Replace("Ó", "O")
+            .Replace("É", "E")
+            .Replace("Á", "A")
+            .Replace("Í", "I")
+            .Replace("Ú", "U")
+            .Replace("Ñ", "N")
+            .Replace("Ã³", "o")
+            .Replace("Ã©", "e")
+            .Replace("Ã¡", "a")
+            .Replace("Ã­", "i")
+            .Replace("Ãº", "u")
+            .Replace("°", "")
+            .Replace("Nro.", "N")
+            .Trim();
     }
 
     private async Task ApplyCallYearFilterAsync(IPage page, int? callYear)

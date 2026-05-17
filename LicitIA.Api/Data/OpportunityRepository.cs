@@ -33,7 +33,19 @@ public sealed class OpportunityRepository
                 Location,
                 IsPriority,
                 PublishedDate,
-                SeaceIndex
+                SeaceIndex,
+                SelectionType,
+                ConvocationNumber,
+                ApplicableRegulation,
+                SeaceVersion,
+                EntityLegalAddress,
+                EntityWebsite,
+                EntityPhone,
+                ContractObject,
+                ParticipationCost,
+                BasesReproductionCost,
+                SeaceDetailJson,
+                SeaceScheduleJson
             FROM dbo.Opportunities
             ORDER BY SeaceIndex ASC;
             """;
@@ -71,7 +83,19 @@ public sealed class OpportunityRepository
                 Location,
                 IsPriority,
                 PublishedDate,
-                SeaceIndex
+                SeaceIndex,
+                SelectionType,
+                ConvocationNumber,
+                ApplicableRegulation,
+                SeaceVersion,
+                EntityLegalAddress,
+                EntityWebsite,
+                EntityPhone,
+                ContractObject,
+                ParticipationCost,
+                BasesReproductionCost,
+                SeaceDetailJson,
+                SeaceScheduleJson
             FROM dbo.Opportunities
             WHERE OpportunityId = @OpportunityId;
             """;
@@ -109,7 +133,19 @@ public sealed class OpportunityRepository
                 Location,
                 IsPriority,
                 PublishedDate,
-                SeaceIndex
+                SeaceIndex,
+                SelectionType,
+                ConvocationNumber,
+                ApplicableRegulation,
+                SeaceVersion,
+                EntityLegalAddress,
+                EntityWebsite,
+                EntityPhone,
+                ContractObject,
+                ParticipationCost,
+                BasesReproductionCost,
+                SeaceDetailJson,
+                SeaceScheduleJson
             FROM dbo.Opportunities
             WHERE ProcessCode = @ProcessCode;
             """;
@@ -169,7 +205,19 @@ public sealed class OpportunityRepository
                 Location,
                 IsPriority,
                 PublishedDate,
-                SeaceIndex
+                SeaceIndex,
+                SelectionType,
+                ConvocationNumber,
+                ApplicableRegulation,
+                SeaceVersion,
+                EntityLegalAddress,
+                EntityWebsite,
+                EntityPhone,
+                ContractObject,
+                ParticipationCost,
+                BasesReproductionCost,
+                SeaceDetailJson,
+                SeaceScheduleJson
             )
             VALUES
             (
@@ -186,7 +234,19 @@ public sealed class OpportunityRepository
                 @Location,
                 @IsPriority,
                 @PublishedDate,
-                @SeaceIndex
+                @SeaceIndex,
+                @SelectionType,
+                @ConvocationNumber,
+                @ApplicableRegulation,
+                @SeaceVersion,
+                @EntityLegalAddress,
+                @EntityWebsite,
+                @EntityPhone,
+                @ContractObject,
+                @ParticipationCost,
+                @BasesReproductionCost,
+                @SeaceDetailJson,
+                @SeaceScheduleJson
             );
             """;
 
@@ -205,6 +265,18 @@ public sealed class OpportunityRepository
         command.Parameters.AddWithValue("@IsPriority", opportunity.IsPriority);
         command.Parameters.AddWithValue("@PublishedDate", opportunity.PublishedDate);
         command.Parameters.AddWithValue("@SeaceIndex", opportunity.SeaceIndex);
+        command.Parameters.AddWithValue("@SelectionType", opportunity.SelectionType);
+        command.Parameters.AddWithValue("@ConvocationNumber", opportunity.ConvocationNumber);
+        command.Parameters.AddWithValue("@ApplicableRegulation", opportunity.ApplicableRegulation);
+        command.Parameters.AddWithValue("@SeaceVersion", opportunity.SeaceVersion);
+        command.Parameters.AddWithValue("@EntityLegalAddress", opportunity.EntityLegalAddress);
+        command.Parameters.AddWithValue("@EntityWebsite", opportunity.EntityWebsite);
+        command.Parameters.AddWithValue("@EntityPhone", opportunity.EntityPhone);
+        command.Parameters.AddWithValue("@ContractObject", opportunity.ContractObject);
+        command.Parameters.AddWithValue("@ParticipationCost", opportunity.ParticipationCost);
+        command.Parameters.AddWithValue("@BasesReproductionCost", opportunity.BasesReproductionCost);
+        command.Parameters.AddWithValue("@SeaceDetailJson", opportunity.SeaceDetailJson);
+        command.Parameters.AddWithValue("@SeaceScheduleJson", opportunity.SeaceScheduleJson);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -266,6 +338,24 @@ public sealed class OpportunityRepository
             Location = reader.GetString(reader.GetOrdinal("Location")),
             IsPriority = reader.GetBoolean(reader.GetOrdinal("IsPriority")),
             PublishedDate = reader.IsDBNull(reader.GetOrdinal("PublishedDate")) ? null : reader.GetDateTime(reader.GetOrdinal("PublishedDate")),
-            SeaceIndex = reader.IsDBNull(reader.GetOrdinal("SeaceIndex")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("SeaceIndex"))
+            SeaceIndex = reader.IsDBNull(reader.GetOrdinal("SeaceIndex")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("SeaceIndex")),
+            SelectionType = GetString(reader, "SelectionType"),
+            ConvocationNumber = GetString(reader, "ConvocationNumber"),
+            ApplicableRegulation = GetString(reader, "ApplicableRegulation"),
+            SeaceVersion = GetString(reader, "SeaceVersion"),
+            EntityLegalAddress = GetString(reader, "EntityLegalAddress"),
+            EntityWebsite = GetString(reader, "EntityWebsite"),
+            EntityPhone = GetString(reader, "EntityPhone"),
+            ContractObject = GetString(reader, "ContractObject"),
+            ParticipationCost = GetString(reader, "ParticipationCost"),
+            BasesReproductionCost = GetString(reader, "BasesReproductionCost"),
+            SeaceDetailJson = GetString(reader, "SeaceDetailJson"),
+            SeaceScheduleJson = GetString(reader, "SeaceScheduleJson")
         };
+
+    private static string GetString(SqlDataReader reader, string columnName)
+    {
+        var ordinal = reader.GetOrdinal(columnName);
+        return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+    }
 }
