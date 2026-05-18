@@ -32,7 +32,7 @@ public class CompanyProfileRepository
             const string sql =@"
                 SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                        MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                       PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                       PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, SeaceProvince, SeaceDistrict, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                        CreatedAtUtc, UpdatedAtUtc
                 FROM dbo.CompanyProfile
                 WHERE UserId = @UserId;";
@@ -75,7 +75,7 @@ public class CompanyProfileRepository
         const string sql = @"
             SELECT TOP 1 ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                    MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, SeaceProvince, SeaceDistrict, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                    CreatedAtUtc, UpdatedAtUtc
             FROM dbo.CompanyProfile
             WHERE UserId IS NULL
@@ -100,7 +100,7 @@ public class CompanyProfileRepository
         const string sql = @"
             SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                    MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, SeaceProvince, SeaceDistrict, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                    CreatedAtUtc, UpdatedAtUtc
             FROM dbo.CompanyProfile
             WHERE UserId IS NOT NULL
@@ -126,12 +126,12 @@ public class CompanyProfileRepository
         const string sql = @"
             INSERT INTO dbo.CompanyProfile (UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                                             MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                                            PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, 
+                                            PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, SeaceProvince, SeaceDistrict, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, 
                                             CreatedAtUtc, UpdatedAtUtc)
             OUTPUT INSERTED.ProfileId
             VALUES (@UserId, @CompanyName, @PreferredCategories, @PreferredLocations, @PreferredModalities,
                     @MinAmount, @MaxAmount, @IdealAmount, @FavoriteEntities, @ExcludedEntities, 
-                    @PreferredKeywords, @ExcludedKeywords, @SeaceObjectDescription, @SeaceCallYear, @SeaceContractObject, @SeaceEntityAcronym, @SeaceDepartment, @MinDaysToClose, @MaxDaysToClose, @IdealDaysToClose,
+                    @PreferredKeywords, @ExcludedKeywords, @SeaceObjectDescription, @SeaceCallYear, @SeaceContractObject, @SeaceEntityAcronym, @SeaceDepartment, @SeaceProvince, @SeaceDistrict, @MinDaysToClose, @MaxDaysToClose, @IdealDaysToClose,
                     GETUTCDATE(), GETUTCDATE());";
 
         await using var command = new SqlCommand(sql, connection);
@@ -152,6 +152,8 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@SeaceContractObject", NormalizeSeaceContractObject(profile.SeaceContractObject));
         command.Parameters.AddWithValue("@SeaceEntityAcronym", profile.SeaceEntityAcronym.Trim());
         command.Parameters.AddWithValue("@SeaceDepartment", profile.SeaceDepartment.Trim());
+        command.Parameters.AddWithValue("@SeaceProvince", profile.SeaceProvince.Trim());
+        command.Parameters.AddWithValue("@SeaceDistrict", profile.SeaceDistrict.Trim());
         command.Parameters.AddWithValue("@MinDaysToClose", profile.MinDaysToClose);
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
@@ -183,6 +185,8 @@ public class CompanyProfileRepository
                 SeaceContractObject = @SeaceContractObject,
                 SeaceEntityAcronym = @SeaceEntityAcronym,
                 SeaceDepartment = @SeaceDepartment,
+                SeaceProvince = @SeaceProvince,
+                SeaceDistrict = @SeaceDistrict,
                 MinDaysToClose = @MinDaysToClose,
                 MaxDaysToClose = @MaxDaysToClose,
                 IdealDaysToClose = @IdealDaysToClose,
@@ -209,6 +213,8 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@SeaceContractObject", NormalizeSeaceContractObject(profile.SeaceContractObject));
         command.Parameters.AddWithValue("@SeaceEntityAcronym", profile.SeaceEntityAcronym.Trim());
         command.Parameters.AddWithValue("@SeaceDepartment", profile.SeaceDepartment.Trim());
+        command.Parameters.AddWithValue("@SeaceProvince", profile.SeaceProvince.Trim());
+        command.Parameters.AddWithValue("@SeaceDistrict", profile.SeaceDistrict.Trim());
         command.Parameters.AddWithValue("@MinDaysToClose", profile.MinDaysToClose);
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
@@ -258,6 +264,8 @@ public class CompanyProfileRepository
             SeaceContractObject = reader.IsDBNull(reader.GetOrdinal("SeaceContractObject")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceContractObject")),
             SeaceEntityAcronym = reader.IsDBNull(reader.GetOrdinal("SeaceEntityAcronym")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceEntityAcronym")),
             SeaceDepartment = reader.IsDBNull(reader.GetOrdinal("SeaceDepartment")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceDepartment")),
+            SeaceProvince = reader.IsDBNull(reader.GetOrdinal("SeaceProvince")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceProvince")),
+            SeaceDistrict = reader.IsDBNull(reader.GetOrdinal("SeaceDistrict")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceDistrict")),
             MinDaysToClose = reader.GetInt32(reader.GetOrdinal("MinDaysToClose")),
             MaxDaysToClose = reader.GetInt32(reader.GetOrdinal("MaxDaysToClose")),
             IdealDaysToClose = reader.GetInt32(reader.GetOrdinal("IdealDaysToClose")),

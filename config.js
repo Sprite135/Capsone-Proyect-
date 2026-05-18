@@ -97,6 +97,16 @@ function populateForm(profile) {
     seaceDepartmentInput.value = profile.seaceDepartment || '';
   }
 
+  const seaceProvinceInput = document.getElementById('seaceProvince');
+  if (seaceProvinceInput) {
+    seaceProvinceInput.value = profile.seaceProvince || '';
+  }
+
+  const seaceDistrictInput = document.getElementById('seaceDistrict');
+  if (seaceDistrictInput) {
+    seaceDistrictInput.value = profile.seaceDistrict || '';
+  }
+
   preferredKeywords = profile.preferredKeywords || [];
   excludedKeywords = profile.excludedKeywords || [];
   renderKeywords();
@@ -351,6 +361,14 @@ function getFormData() {
   const seaceDepartment = seaceDepartmentInput
     ? seaceDepartmentInput.value
     : currentProfile?.seaceDepartment || '';
+  const seaceProvinceInput = document.getElementById('seaceProvince');
+  const seaceProvince = seaceProvinceInput
+    ? seaceProvinceInput.value.trim()
+    : currentProfile?.seaceProvince || '';
+  const seaceDistrictInput = document.getElementById('seaceDistrict');
+  const seaceDistrict = seaceDistrictInput
+    ? seaceDistrictInput.value.trim()
+    : currentProfile?.seaceDistrict || '';
 
   return {
     companyName: companyName || 'Default',
@@ -369,6 +387,8 @@ function getFormData() {
     seaceContractObject,
     seaceEntityAcronym,
     seaceDepartment,
+    seaceProvince,
+    seaceDistrict,
     minDaysToClose: currentProfile?.minDaysToClose || 3,
     maxDaysToClose: currentProfile?.maxDaysToClose || 30,
     idealDaysToClose: currentProfile?.idealDaysToClose || 15

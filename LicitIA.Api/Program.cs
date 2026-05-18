@@ -959,6 +959,8 @@ app.MapPost("/api/seace/refresh", async (
         var contractObject = profile?.SeaceContractObject;
         var entityAcronym = profile?.SeaceEntityAcronym;
         var department = profile?.SeaceDepartment;
+        var province = profile?.SeaceProvince;
+        var district = profile?.SeaceDistrict;
         if (!string.IsNullOrWhiteSpace(objectDescription))
         {
             Console.WriteLine($"[SeaceScraper] Usando filtro Descripcion del Objeto: {objectDescription}");
@@ -975,6 +977,14 @@ app.MapPost("/api/seace/refresh", async (
         {
             Console.WriteLine($"[SeaceScraper] Usando filtro avanzado Departamento: {department}");
         }
+        if (!string.IsNullOrWhiteSpace(province))
+        {
+            Console.WriteLine($"[SeaceScraper] Usando filtro avanzado Provincia: {province}");
+        }
+        if (!string.IsNullOrWhiteSpace(district))
+        {
+            Console.WriteLine($"[SeaceScraper] Usando filtro avanzado Distrito: {district}");
+        }
         Console.WriteLine($"[SeaceScraper] Usando filtro Año de Convocatoria: {callYear}");
 
         // Limpiar todas las oportunidades existentes
@@ -982,7 +992,7 @@ app.MapPost("/api/seace/refresh", async (
         Console.WriteLine($"[SeaceScraper] Base de datos limpiada.");
 
         // Descargar datos de SEACE
-        var seaceOpportunities = await seaceScraperService.ScrapeOpportunitiesAsync(maxResults, cancellationToken, objectDescription, callYear, contractObject, entityAcronym, department);
+        var seaceOpportunities = await seaceScraperService.ScrapeOpportunitiesAsync(maxResults, cancellationToken, objectDescription, callYear, contractObject, entityAcronym, department, province, district);
 
         if (seaceOpportunities.Count == 0)
         {

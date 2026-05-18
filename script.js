@@ -40,6 +40,8 @@ const seaceObjectDescriptionModal = document.getElementById("seaceObjectDescript
 const seaceContractObjectModal = document.getElementById("seaceContractObjectModal");
 const seaceEntityAcronymModal = document.getElementById("seaceEntityAcronymModal");
 const seaceDepartmentModal = document.getElementById("seaceDepartmentModal");
+const seaceProvinceModal = document.getElementById("seaceProvinceModal");
+const seaceDistrictModal = document.getElementById("seaceDistrictModal");
 const seaceCallYearModal = document.getElementById("seaceCallYearModal");
 const runAiAnalysisButton = document.getElementById("runAiAnalysisButton");
 const aiAnalysisList = document.getElementById("aiAnalysisList");
@@ -50,9 +52,52 @@ let allOpportunities = [];
 let currentPage = 1;
 const itemsPerPage = 15;
 let lastFilteredCount = 0;
-let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "", seaceContractObject: "", seaceEntityAcronym: "", seaceDepartment: "", seaceCallYear: new Date().getFullYear() };
+let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "", seaceContractObject: "", seaceEntityAcronym: "", seaceDepartment: "", seaceProvince: "", seaceDistrict: "", seaceCallYear: new Date().getFullYear() };
 let currentProfile = null;
 let currentDetailOpportunityId = null;
+let currentDetailOpportunity = null;
+
+const seaceProvincesByDepartment = {
+  Amazonas: ["Bagua", "Bongara", "Chachapoyas", "Condorcanqui", "Luya", "Rodriguez de Mendoza", "Utcubamba"],
+  Ancash: ["Aija", "Antonio Raymondi", "Asuncion", "Bolognesi", "Carhuaz", "Carlos Fermin Fitzcarrald", "Casma", "Corongo", "Huaraz", "Huari", "Huarmey", "Huaylas", "Mariscal Luzuriaga", "Ocros", "Pallasca", "Pomabamba", "Recuay", "Santa", "Sihuas", "Yungay"],
+  Apurimac: ["Abancay", "Andahuaylas", "Antabamba", "Aymaraes", "Chincheros", "Cotabambas", "Grau"],
+  Arequipa: ["Arequipa", "Camana", "Caraveli", "Castilla", "Caylloma", "Condesuyos", "Islay", "La Union"],
+  Ayacucho: ["Cangallo", "Huamanga", "Huanca Sancos", "Huanta", "La Mar", "Lucanas", "Parinacochas", "Paucar del Sara Sara", "Sucre", "Victor Fajardo", "Vilcas Huaman"],
+  Cajamarca: ["Cajabamba", "Cajamarca", "Celendin", "Chota", "Contumaza", "Cutervo", "Hualgayoc", "Jaen", "San Ignacio", "San Marcos", "San Miguel", "San Pablo", "Santa Cruz"],
+  Callao: ["Callao"],
+  Cusco: ["Acomayo", "Anta", "Calca", "Canas", "Canchis", "Chumbivilcas", "Cusco", "Espinar", "La Convencion", "Paruro", "Paucartambo", "Quispicanchi", "Urubamba"],
+  Huancavelica: ["Acobamba", "Angaraes", "Castrovirreyna", "Churcampa", "Huancavelica", "Huaytara", "Tayacaja"],
+  Huanuco: ["Ambo", "Dos de Mayo", "Huacaybamba", "Huamalies", "Huanuco", "Lauricocha", "Leoncio Prado", "Marañon", "Pachitea", "Puerto Inca", "Yarowilca"],
+  Ica: ["Chincha", "Ica", "Nazca", "Palpa", "Pisco"],
+  Junin: ["Chanchamayo", "Chupaca", "Concepcion", "Huancayo", "Jauja", "Junin", "Satipo", "Tarma", "Yauli"],
+  "La Libertad": ["Ascope", "Bolivar", "Chepen", "Gran Chimu", "Julcan", "Otuzco", "Pacasmayo", "Pataz", "Sanchez Carrion", "Santiago de Chuco", "Trujillo", "Viru"],
+  Lambayeque: ["Chiclayo", "Ferreñafe", "Lambayeque"],
+  Lima: ["Barranca", "Cajatambo", "Canta", "Cañete", "Huaral", "Huarochiri", "Huaura", "Lima", "Oyon", "Yauyos"],
+  Loreto: ["Alto Amazonas", "Datem del Marañon", "Loreto", "Mariscal Ramon Castilla", "Maynas", "Putumayo", "Requena", "Ucayali"],
+  "Madre de Dios": ["Manu", "Tahuamanu", "Tambopata"],
+  Moquegua: ["General Sanchez Cerro", "Ilo", "Mariscal Nieto"],
+  Pasco: ["Daniel Alcides Carrion", "Oxapampa", "Pasco"],
+  Piura: ["Ayabaca", "Huancabamba", "Morropón", "Paita", "Piura", "Sechura", "Sullana", "Talara"],
+  Puno: ["Azangaro", "Carabaya", "Chucuito", "El Collao", "Huancane", "Lampa", "Melgar", "Moho", "Puno", "San Antonio de Putina", "San Roman", "Sandia", "Yunguyo"],
+  "San Martin": ["Bellavista", "El Dorado", "Huallaga", "Lamas", "Mariscal Caceres", "Moyobamba", "Picota", "Rioja", "San Martin", "Tocache"],
+  Tacna: ["Candarave", "Jorge Basadre", "Tacna", "Tarata"],
+  Tumbes: ["Contralmirante Villar", "Tumbes", "Zarumilla"],
+  Ucayali: ["Atalaya", "Coronel Portillo", "Padre Abad", "Purus"]
+};
+
+const seaceDistrictsByProvince = {
+  Barranca: ["Barranca", "Paramonga", "Pativilca", "Supe", "Supe Puerto"],
+  Cajatambo: ["Cajatambo", "Copa", "Gorgor", "Huancapon", "Manas"],
+  Canta: ["Arahuay", "Canta", "Huamantanga", "Huaros", "Lachaqui", "San Buenaventura", "Santa Rosa de Quives"],
+  "CaÃ±ete": ["Asia", "Calango", "Cerro Azul", "Chilca", "Coayllo", "Imperial", "Lunahuana", "Mala", "Nuevo Imperial", "Pacaran", "Quilmana", "San Antonio", "San Luis", "San Vicente de Cañete", "Santa Cruz de Flores", "Zuñiga"],
+  Huaral: ["Atavillos Alto", "Atavillos Bajo", "Aucallama", "Chancay", "Huaral", "Ihuari", "Lampian", "Pacaraos", "San Miguel de Acos", "Santa Cruz de Andamarca", "Sumbilca", "Veintisiete de Noviembre"],
+  Huarochiri: ["Antioquia", "Callahuanca", "Carampoma", "Chicla", "Cuenca", "Huachupampa", "Huanza", "Huarochiri", "Lahuaytambo", "Langa", "Laraos", "Mariatana", "Matucana", "Ricardo Palma", "San Andres de Tupicocha", "San Antonio", "San Bartolome", "San Damian", "San Juan de Iris", "San Juan de Tantaranche", "San Lorenzo de Quinti", "San Mateo", "San Mateo de Otao", "San Pedro de Casta", "San Pedro de Huancayre", "Sangallaya", "Santa Cruz de Cocachacra", "Santa Eulalia", "Santiago de Anchucaya", "Santiago de Tuna", "Santo Domingo de los Olleros", "Surco"],
+  Huaura: ["Ambar", "Caleta de Carquin", "Checras", "Huacho", "Hualmay", "Huaura", "Leoncio Prado", "Paccho", "Santa Leonor", "Santa Maria", "Sayan", "Vegueta"],
+  Lima: ["Ancon", "Ate", "Barranco", "Breña", "Carabayllo", "Chaclacayo", "Chorrillos", "Cieneguilla", "Comas", "El Agustino", "Independencia", "Jesus Maria", "La Molina", "La Victoria", "Lima", "Lince", "Los Olivos", "Lurigancho", "Lurin", "Magdalena del Mar", "Miraflores", "Pachacamac", "Pucusana", "Pueblo Libre", "Puente Piedra", "Punta Hermosa", "Punta Negra", "Rimac", "San Bartolo", "San Borja", "San Isidro", "San Juan de Lurigancho", "San Juan de Miraflores", "San Luis", "San Martin de Porres", "San Miguel", "Santa Anita", "Santa Maria del Mar", "Santa Rosa", "Santiago de Surco", "Surquillo", "Villa El Salvador", "Villa Maria del Triunfo"],
+  Oyon: ["Andajes", "Caujul", "Cochamarca", "Navan", "Oyon", "Pachangara"],
+  Yauyos: ["Alis", "Ayauca", "Ayaviri", "Azangaro", "Cacra", "Carania", "Catahuasi", "Chocos", "Cochas", "Colonia", "Hongos", "Huampara", "Huancaya", "Huangascar", "Huantan", "Huañec", "Laraos", "Lincha", "Madean", "Miraflores", "Omas", "Putinza", "Quinches", "Quinocay", "San Joaquin", "San Pedro de Pilas", "Tanta", "Tauripampa", "Tomas", "Tupe", "Viñac", "Vitis"],
+  Callao: ["Bellavista", "Callao", "Carmen de la Legua Reynoso", "La Perla", "La Punta", "Mi Peru", "Ventanilla"]
+};
 
 function handleOAuthRedirect() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -210,6 +255,19 @@ if (runSeaceFilterButton) {
       closeSeaceModal();
       await syncSeace();
     }
+  });
+}
+
+if (seaceDepartmentModal) {
+  seaceDepartmentModal.addEventListener("change", () => {
+    populateSeaceProvinceOptions(seaceDepartmentModal.value);
+    populateSeaceDistrictOptions("");
+  });
+}
+
+if (seaceProvinceModal) {
+  seaceProvinceModal.addEventListener("change", () => {
+    populateSeaceDistrictOptions(seaceProvinceModal.value);
   });
 }
 
@@ -737,6 +795,8 @@ async function loadProfile() {
       profileKeywords.seaceContractObject = profile.seaceContractObject || "";
       profileKeywords.seaceEntityAcronym = profile.seaceEntityAcronym || "";
       profileKeywords.seaceDepartment = profile.seaceDepartment || "";
+      profileKeywords.seaceProvince = profile.seaceProvince || "";
+      profileKeywords.seaceDistrict = profile.seaceDistrict || "";
       profileKeywords.seaceCallYear = normalizeSeaceYear(profile.seaceCallYear);
       console.log('Profile loaded:', profileKeywords);
     }
@@ -775,6 +835,57 @@ function populateSeaceYearOptions(selectElement) {
   selectElement.innerHTML = years.join("");
 }
 
+function populateSeaceProvinceOptions(department, selectedProvince = "") {
+  if (!seaceProvinceModal) {
+    return;
+  }
+
+  const provinces = seaceProvincesByDepartment[department] || [];
+  if (provinces.length === 0) {
+    seaceProvinceModal.innerHTML = '<option value="">[Seleccione un departamento primero]</option>';
+    seaceProvinceModal.value = "";
+    seaceProvinceModal.disabled = true;
+    return;
+  }
+
+  const options = ['<option value="">[Seleccione]</option>']
+    .concat(provinces.map(province => `<option value="${escapeHtml(province)}">${escapeHtml(province)}</option>`));
+
+  seaceProvinceModal.innerHTML = options.join("");
+  seaceProvinceModal.disabled = false;
+
+  if (selectedProvince && provinces.some(province => normalizeComparableText(province) === normalizeComparableText(selectedProvince))) {
+    seaceProvinceModal.value = provinces.find(province => normalizeComparableText(province) === normalizeComparableText(selectedProvince));
+  } else {
+    seaceProvinceModal.value = "";
+  }
+}
+
+function populateSeaceDistrictOptions(province, selectedDistrict = "") {
+  if (!seaceDistrictModal) {
+    return;
+  }
+
+  const districts = seaceDistrictsByProvince[province] || [];
+  if (districts.length === 0) {
+    seaceDistrictModal.innerHTML = '<option value="">[Seleccione una provincia primero]</option>';
+    seaceDistrictModal.value = "";
+    seaceDistrictModal.disabled = true;
+    return;
+  }
+
+  const options = ['<option value="">[Seleccione]</option>']
+    .concat(districts.map(district => `<option value="${escapeHtml(district)}">${escapeHtml(district)}</option>`));
+
+  seaceDistrictModal.innerHTML = options.join("");
+  seaceDistrictModal.disabled = false;
+
+  const match = selectedDistrict
+    ? districts.find(district => normalizeComparableText(district) === normalizeComparableText(selectedDistrict))
+    : "";
+  seaceDistrictModal.value = match || "";
+}
+
 function normalizeSeaceYear(value) {
   const currentYear = new Date().getFullYear();
   const year = Number(value);
@@ -805,6 +916,15 @@ async function openSeaceFilterModal() {
   if (seaceDepartmentModal) {
     seaceDepartmentModal.value = currentProfile?.seaceDepartment || profileKeywords.seaceDepartment || "";
   }
+
+  populateSeaceProvinceOptions(
+    seaceDepartmentModal?.value || "",
+    currentProfile?.seaceProvince || profileKeywords.seaceProvince || ""
+  );
+  populateSeaceDistrictOptions(
+    seaceProvinceModal?.value || "",
+    currentProfile?.seaceDistrict || profileKeywords.seaceDistrict || ""
+  );
 
   if (seaceCallYearModal) {
     seaceCallYearModal.value = String(normalizeSeaceYear(currentProfile?.seaceCallYear || profileKeywords.seaceCallYear));
@@ -844,6 +964,8 @@ function buildUpdatedProfile() {
     seaceContractObject: seaceContractObjectModal?.value || "",
     seaceEntityAcronym: seaceEntityAcronymModal?.value.trim() || "",
     seaceDepartment: seaceDepartmentModal?.value || "",
+    seaceProvince: seaceProvinceModal?.value.trim() || "",
+    seaceDistrict: seaceDistrictModal?.value || "",
     seaceCallYear: normalizeSeaceYear(seaceCallYearModal?.value || currentYear),
     minDaysToClose: currentProfile?.minDaysToClose || 3,
     maxDaysToClose: currentProfile?.maxDaysToClose || 30,
@@ -879,6 +1001,8 @@ async function saveSeaceFilter() {
     profileKeywords.seaceContractObject = currentProfile.seaceContractObject || "";
     profileKeywords.seaceEntityAcronym = currentProfile.seaceEntityAcronym || "";
     profileKeywords.seaceDepartment = currentProfile.seaceDepartment || "";
+    profileKeywords.seaceProvince = currentProfile.seaceProvince || "";
+    profileKeywords.seaceDistrict = currentProfile.seaceDistrict || "";
     profileKeywords.seaceCallYear = normalizeSeaceYear(currentProfile.seaceCallYear);
     setMessage("Filtro SEACE guardado.");
     return true;
@@ -1133,7 +1257,9 @@ async function loadOpportunityDetail() {
       throw new Error("No se pudo obtener el detalle.");
     }
 
+    currentDetailOpportunity = data;
     renderOpportunityDetail(data);
+    renderLocalAiSummary(data);
     await loadAiAnalysisStatus(opportunityId);
     setMessage(`Detalle cargado: ${data.processCode}.`);
   } catch (error) {
@@ -1150,6 +1276,21 @@ if (runAiAnalysisButton) {
     await requestAiAnalysis(currentDetailOpportunityId);
   });
 }
+
+document.querySelectorAll('.page-tabs a[href^="#"]').forEach((tabLink) => {
+  tabLink.addEventListener("click", (event) => {
+    const targetSelector = tabLink.getAttribute("href");
+    const target = targetSelector ? document.querySelector(targetSelector) : null;
+    if (!target) {
+      return;
+    }
+
+    event.preventDefault();
+    document.querySelectorAll(".page-tabs a").forEach((item) => item.classList.remove("active"));
+    tabLink.classList.add("active");
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+});
 
 async function loadAiAnalysisStatus(opportunityId) {
   if (!aiAnalysisList || !aiStatusText) {
@@ -1176,20 +1317,24 @@ async function loadAiAnalysisStatus(opportunityId) {
 
     if (!data.configured) {
       aiStatusText.textContent = "Gemini no esta configurado. La recomendacion basica sigue funcionando sin costo.";
+      renderLocalAiSummary(currentDetailOpportunity);
       if (runAiAnalysisButton) runAiAnalysisButton.disabled = true;
       return;
     }
 
     if (data.remainingToday <= 0) {
       aiStatusText.textContent = "Limite diario de IA alcanzado. La recomendacion basica sigue disponible.";
+      renderLocalAiSummary(currentDetailOpportunity);
       if (runAiAnalysisButton) runAiAnalysisButton.disabled = true;
       return;
     }
 
     aiStatusText.textContent = "Gemini esta disponible para generar un analisis avanzado de esta oportunidad.";
+    renderLocalAiSummary(currentDetailOpportunity);
     if (runAiAnalysisButton) runAiAnalysisButton.disabled = false;
   } catch (error) {
     aiStatusText.textContent = "No se pudo consultar el estado de IA. Verifica la migracion de base de datos.";
+    renderLocalAiSummary(currentDetailOpportunity);
     if (runAiAnalysisButton) runAiAnalysisButton.disabled = true;
   }
 }
@@ -1254,12 +1399,36 @@ function renderAiAnalysis(analysis) {
   }
 
   aiAnalysisList.innerHTML = `
+    ${currentDetailOpportunity ? createAiAnalysisItem("IA", "Resumen local", getLocalAiSummaryText(currentDetailOpportunity)) : ""}
     ${createAiAnalysisItem(1, "Decision sugerida", analysis.recommendation)}
     ${createAiAnalysisItem(2, "Resumen IA", analysis.summary)}
     ${createAiAnalysisItem(3, "Riesgos", analysis.risks)}
     ${createAiAnalysisItem(4, "Requisitos a revisar", analysis.requirements)}
     ${createAiAnalysisItem(5, "Siguientes pasos", analysis.nextSteps)}
   `;
+}
+
+function renderLocalAiSummary(item) {
+  if (!aiAnalysisList || !item) {
+    return;
+  }
+
+  aiAnalysisList.innerHTML = `
+    ${createAiAnalysisItem("IA", "Resumen local", getLocalAiSummaryText(item))}
+    ${createAiAnalysisItem(1, item.recommendationLabel || "Recomendacion basica", item.recommendationReason || getInsightTitle(item))}
+    ${createAiAnalysisItem(2, "Afinidad", `${item.matchScore || 0}% calculado con tus palabras clave y preferencias.`)}
+  `;
+}
+
+function getLocalAiSummaryText(item) {
+  const parts = [
+    item.summary || item.description,
+    item.entityName ? `Entidad: ${item.entityName}.` : "",
+    item.contractObject ? `Objeto: ${item.contractObject}.` : "",
+    item.closingDate ? `Cierre: ${formatDate(item.closingDate)}.` : ""
+  ].filter(Boolean);
+
+  return parts.join(" ");
 }
 
 function createAiAnalysisItem(number, title, text) {
@@ -1579,12 +1748,35 @@ function renderSeaceSchedule(scheduleJson) {
     return;
   }
 
-  detailScheduleList.innerHTML = schedule.map(item => `
-    <div class="schedule-item">
-      <strong>${escapeHtml(item.etapa || "Etapa")}</strong>
-      <span>${escapeHtml(item.fechaInicio || "Sin inicio")} - ${escapeHtml(item.fechaFin || "Sin fin")}</span>
+  detailScheduleList.innerHTML = `
+    <div class="schedule-table-wrap">
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>Etapa</th>
+            <th>Fecha Inicio</th>
+            <th>Fecha Fin</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${schedule.map(item => `
+            <tr class="${isHighlightedScheduleStage(item.etapa) ? 'schedule-row-highlight' : ''}">
+              <td>${escapeHtml(item.etapa || "Etapa")}</td>
+              <td>${escapeHtml(item.fechaInicio || "Sin inicio")}</td>
+              <td>${escapeHtml(item.fechaFin || "Sin fin")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
     </div>
-  `).join("");
+  `;
+}
+
+function isHighlightedScheduleStage(stage) {
+  const value = normalizeComparableText(stage);
+  return value.includes("registro de participantes") ||
+    value.includes("formulacion de consultas") ||
+    value.includes("observaciones");
 }
 
 function renderSeaceFields(detailJson) {

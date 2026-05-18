@@ -25,14 +25,16 @@ public class SeaceScraperService
         int? callYear = null,
         string? contractObject = null,
         string? entityAcronym = null,
-        string? department = null)
+        string? department = null,
+        string? province = null,
+        string? district = null)
     {
         try
         {
             Console.WriteLine("[SeaceScraper] Iniciando scraping con Playwright...");
 
             // Usar Playwright para scraping de SEACE
-            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear, contractObject, entityAcronym, department);
+            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear, contractObject, entityAcronym, department, province, district);
 
             if (opportunities.Count > 0)
             {
@@ -52,7 +54,7 @@ public class SeaceScraperService
         }
     }
 
-    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear, string? contractObject, string? entityAcronym, string? department)
+    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear, string? contractObject, string? entityAcronym, string? department, string? province, string? district)
     {
         var opportunities = new List<ScrapedOpportunity>();
 
@@ -104,8 +106,11 @@ public class SeaceScraperService
 
             await ApplyCallYearFilterAsync(page, callYear);
             await ApplyContractObjectFilterAsync(page, contractObject);
+            await EnsureAdvancedSearchExpandedAsync(page, entityAcronym, department, province, district);
             await ApplyEntityAcronymFilterAsync(page, entityAcronym);
             await ApplyDepartmentFilterAsync(page, department);
+            await ApplyProvinceFilterAsync(page, province);
+            await ApplyDistrictFilterAsync(page, district);
             await ApplyObjectDescriptionFilterAsync(page, objectDescription);
 
             Console.WriteLine("[SeaceScraper] Esperando botón 'Buscar'...");
@@ -1314,6 +1319,73 @@ public class SeaceScraperService
         };
     }
 
+    private async Task EnsureAdvancedSearchExpandedAsync(IPage page, params string?[] advancedValues)
+    {
+        if (!advancedValues.Any(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtros avanzados; no se abre Busqueda Avanzada.");
+            return;
+        }
+
+        try
+        {
+            var alreadyVisible = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const ids = [
+                        'tbBuscador:idFormBuscarProceso:siglasEntidad',
+                        'tbBuscador:idFormBuscarProceso:departamento_label',
+                        'tbBuscador:idFormBuscarProceso:provincia_label',
+                        'tbBuscador:idFormBuscarProceso:distrito_label'
+                    ];
+
+                    return ids.some(id => {
+                        const el = document.getElementById(id);
+                        return Boolean(el && el.offsetParent !== null);
+                    });
+                }");
+
+            if (alreadyVisible)
+            {
+                Console.WriteLine("[SeaceScraper] Busqueda Avanzada ya esta visible.");
+                return;
+            }
+
+            var opened = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const legends = Array.from(document.querySelectorAll('.ui-fieldset-legend.ui-corner-all.ui-state-default, .ui-fieldset-legend'));
+                    const target = legends.find(item => normalize(item.textContent).includes('busqueda avanzada')) || legends[0];
+                    if (!target) return false;
+
+                    target.click();
+                    return true;
+                }");
+
+            Console.WriteLine(opened
+                ? "[SeaceScraper] Busqueda Avanzada abierta."
+                : "[SeaceScraper] No se encontro el control de Busqueda Avanzada.");
+
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const input = document.getElementById('tbBuscador:idFormBuscarProceso:siglasEntidad');
+                    const departamento = document.getElementById('tbBuscador:idFormBuscarProceso:departamento_label');
+                    return Boolean((input && input.offsetParent !== null) || (departamento && departamento.offsetParent !== null));
+                }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = 10000 });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo abrir Busqueda Avanzada: {ex.Message}");
+        }
+    }
+
     private async Task ApplyEntityAcronymFilterAsync(IPage page, string? entityAcronym)
     {
         if (string.IsNullOrWhiteSpace(entityAcronym))
@@ -1449,6 +1521,174 @@ public class SeaceScraperService
         catch (Exception ex)
         {
             Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Departamento desde el combo visible: {ex.Message}");
+        }
+    }
+
+    private async Task ApplyProvinceFilterAsync(IPage page, string? province)
+    {
+        if (string.IsNullOrWhiteSpace(province))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtro avanzado Provincia configurado.");
+            return;
+        }
+
+        var optionText = province.Trim();
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro avanzado Provincia: {optionText}");
+
+        try
+        {
+            const string labelSelector = "#tbBuscador\\:idFormBuscarProceso\\:provincia_label";
+            const string panelSelector = "#tbBuscador\\:idFormBuscarProceso\\:provincia_panel";
+
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:provincia_label');
+                    return Boolean(label && label.offsetParent !== null);
+                }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = 15000 });
+
+            var opened = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const root = document.getElementById('tbBuscador:idFormBuscarProceso:provincia');
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:provincia_label');
+                    const trigger = root?.querySelector('.ui-selectonemenu-trigger');
+                    const clickable = trigger || label || root;
+                    if (!clickable) return false;
+
+                    clickable.click();
+                    return true;
+                }");
+
+            Console.WriteLine(opened
+                ? "[SeaceScraper] Combo Provincia abierto."
+                : "[SeaceScraper] No se pudo abrir el combo provincia.");
+
+            await page.WaitForSelectorAsync($"{panelSelector} li.ui-selectonemenu-item", new PageWaitForSelectorOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10000
+            });
+
+            var selected = await page.EvaluateAsync<bool>(
+                @"(optionText) => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const panel = document.getElementById('tbBuscador:idFormBuscarProceso:provincia_panel');
+                    if (!panel) return false;
+
+                    const target = normalize(optionText);
+                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item'));
+                    const option = items.find(item => normalize(item.getAttribute('data-label') || item.textContent) === target);
+                    if (!option) return false;
+
+                    option.click();
+                    return true;
+                }",
+                optionText);
+
+            if (selected)
+            {
+                await Task.Delay(500);
+                var selectedLabel = await page.TextContentAsync(labelSelector);
+                Console.WriteLine($"[SeaceScraper] Provincia seleccionada en UI: {selectedLabel}");
+                return;
+            }
+
+            Console.WriteLine($"[SeaceScraper] No se encontro la provincia '{optionText}' en el combo.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Provincia desde el combo visible: {ex.Message}");
+        }
+    }
+
+    private async Task ApplyDistrictFilterAsync(IPage page, string? district)
+    {
+        if (string.IsNullOrWhiteSpace(district))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtro avanzado Distrito configurado.");
+            return;
+        }
+
+        var optionText = district.Trim();
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro avanzado Distrito: {optionText}");
+
+        try
+        {
+            const string labelSelector = "#tbBuscador\\:idFormBuscarProceso\\:distrito_label";
+            const string panelSelector = "#tbBuscador\\:idFormBuscarProceso\\:distrito_panel";
+
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:distrito_label');
+                    return Boolean(label && label.offsetParent !== null);
+                }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = 15000 });
+
+            var opened = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const root = document.getElementById('tbBuscador:idFormBuscarProceso:distrito');
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:distrito_label');
+                    const trigger = root?.querySelector('.ui-selectonemenu-trigger');
+                    const clickable = trigger || label || root;
+                    if (!clickable) return false;
+
+                    clickable.click();
+                    return true;
+                }");
+
+            Console.WriteLine(opened
+                ? "[SeaceScraper] Combo Distrito abierto."
+                : "[SeaceScraper] No se pudo abrir el combo distrito.");
+
+            await page.WaitForSelectorAsync($"{panelSelector} li.ui-selectonemenu-item", new PageWaitForSelectorOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10000
+            });
+
+            var selected = await page.EvaluateAsync<bool>(
+                @"(optionText) => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const panel = document.getElementById('tbBuscador:idFormBuscarProceso:distrito_panel');
+                    if (!panel) return false;
+
+                    const target = normalize(optionText);
+                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item'));
+                    const option = items.find(item => normalize(item.getAttribute('data-label') || item.textContent) === target);
+                    if (!option) return false;
+
+                    option.click();
+                    return true;
+                }",
+                optionText);
+
+            if (selected)
+            {
+                await Task.Delay(500);
+                var selectedLabel = await page.TextContentAsync(labelSelector);
+                Console.WriteLine($"[SeaceScraper] Distrito seleccionado en UI: {selectedLabel}");
+                return;
+            }
+
+            Console.WriteLine($"[SeaceScraper] No se encontro el distrito '{optionText}' en el combo.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Distrito desde el combo visible: {ex.Message}");
         }
     }
 

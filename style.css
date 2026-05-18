@@ -2068,7 +2068,10 @@ td,
 }
 
 .modal-panel {
-  width: min(560px, 100%);
+  width: min(780px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
@@ -2086,6 +2089,7 @@ td,
 
 .modal-header {
   border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
 }
 
 .modal-header h3 {
@@ -2094,12 +2098,19 @@ td,
 
 .modal-body {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   padding: 24px;
+  overflow-y: auto;
+}
+
+.modal-body > .form-group:first-child,
+.modal-subsection {
+  grid-column: 1 / -1;
 }
 
 .modal-subsection {
-  padding-top: 4px;
+  padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
@@ -2112,6 +2123,7 @@ td,
 .modal-actions {
   justify-content: flex-end;
   border-top: 1px solid var(--line);
+  flex: 0 0 auto;
 }
 
 .icon-button {
@@ -2165,15 +2177,70 @@ td,
 }
 
 .seace-detail-grid span,
-.schedule-item span,
 .schedule-empty {
   color: var(--muted);
 }
 
 .schedule-list {
-  display: grid;
-  gap: 10px;
   margin-top: 12px;
+  overflow-x: auto;
+}
+
+.schedule-block {
+  display: grid;
+  gap: 14px;
+}
+
+.schedule-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(154, 181, 219, 0.18);
+  border-radius: 6px;
+}
+
+.schedule-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+  background: rgba(15, 27, 46, 0.45);
+}
+
+.schedule-table th,
+.schedule-table td {
+  padding: 9px 11px;
+  border: 1px solid rgba(154, 181, 219, 0.16);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.schedule-table th:first-child,
+.schedule-table td:first-child {
+  width: 52%;
+}
+
+.schedule-table th:nth-child(2),
+.schedule-table td:nth-child(2),
+.schedule-table th:nth-child(3),
+.schedule-table td:nth-child(3) {
+  width: 24%;
+}
+
+.schedule-table th {
+  color: #9bc0ff;
+  background: rgba(7, 18, 32, 0.72);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.schedule-table td {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.schedule-table .schedule-row-highlight td {
+  color: #f8e9a3;
+  background: rgba(240, 180, 41, 0.14);
 }
 
 .seace-field-list {
@@ -2203,7 +2270,6 @@ td,
   gap: 10px;
 }
 
-.schedule-item,
 .seace-field-item {
   display: grid;
   gap: 4px;
@@ -2213,7 +2279,6 @@ td,
   background: rgba(15, 27, 46, 0.72);
 }
 
-.schedule-item strong,
 .seace-field-item strong {
   color: var(--text);
 }
@@ -2746,6 +2811,24 @@ button:disabled,
 }
 
 @media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .modal-panel {
+    max-height: calc(100vh - 24px);
+  }
+
+  .modal-header,
+  .modal-actions,
+  .modal-body {
+    padding: 18px;
+  }
+
+  .modal-body {
+    grid-template-columns: 1fr;
+  }
+
   .hero-panel,
   .stat-card,
   .panel-card,
@@ -2762,6 +2845,10 @@ button:disabled,
 
   .result-foot .tracking-status-select {
     width: 100%;
+  }
+
+  .schedule-table {
+    min-width: 520px;
   }
 
   .stats-grid,

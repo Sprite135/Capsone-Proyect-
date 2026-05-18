@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260518-1">
+  <link rel="stylesheet" href="style.css?v=20260518-2">
 </head>
 <body>
   <div class="app-shell">
@@ -237,6 +237,22 @@
             <option value="Ucayali">Ucayali</option>
           </select>
           <small class="help-text">Se abrira el combo departamento de SEACE y se seleccionara la opcion indicada.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="seaceProvinceModal">Provincia</label>
+          <select id="seaceProvinceModal" class="form-control">
+            <option value="">[Seleccione un departamento primero]</option>
+          </select>
+          <small class="help-text">Se seleccionara luego de Departamento, usando el combo provincia de SEACE.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="seaceDistrictModal">Distrito</label>
+          <select id="seaceDistrictModal" class="form-control">
+            <option value="">[Seleccione una provincia primero]</option>
+          </select>
+          <small class="help-text">Se seleccionara luego de Provincia, usando el combo distrito de SEACE.</small>
         </div>
       </div>
 

@@ -40,6 +40,10 @@ public sealed record CompanyProfile
 
     public string SeaceDepartment { get; init; } = string.Empty;
 
+    public string SeaceProvince { get; init; } = string.Empty;
+
+    public string SeaceDistrict { get; init; } = string.Empty;
+
     public int MinDaysToClose { get; init; } = 3;
 
     public int MaxDaysToClose { get; init; } = 30;
