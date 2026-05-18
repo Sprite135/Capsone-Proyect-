@@ -38,6 +38,8 @@ const saveSeaceFilterButton = document.getElementById("saveSeaceFilterButton");
 const runSeaceFilterButton = document.getElementById("runSeaceFilterButton");
 const seaceObjectDescriptionModal = document.getElementById("seaceObjectDescriptionModal");
 const seaceContractObjectModal = document.getElementById("seaceContractObjectModal");
+const seaceEntityAcronymModal = document.getElementById("seaceEntityAcronymModal");
+const seaceDepartmentModal = document.getElementById("seaceDepartmentModal");
 const seaceCallYearModal = document.getElementById("seaceCallYearModal");
 const runAiAnalysisButton = document.getElementById("runAiAnalysisButton");
 const aiAnalysisList = document.getElementById("aiAnalysisList");
@@ -48,7 +50,7 @@ let allOpportunities = [];
 let currentPage = 1;
 const itemsPerPage = 15;
 let lastFilteredCount = 0;
-let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "", seaceContractObject: "", seaceCallYear: new Date().getFullYear() };
+let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "", seaceContractObject: "", seaceEntityAcronym: "", seaceDepartment: "", seaceCallYear: new Date().getFullYear() };
 let currentProfile = null;
 let currentDetailOpportunityId = null;
 
@@ -733,6 +735,8 @@ async function loadProfile() {
       profileKeywords.excluded = profile.excludedKeywords || [];
       profileKeywords.seaceObjectDescription = profile.seaceObjectDescription || "";
       profileKeywords.seaceContractObject = profile.seaceContractObject || "";
+      profileKeywords.seaceEntityAcronym = profile.seaceEntityAcronym || "";
+      profileKeywords.seaceDepartment = profile.seaceDepartment || "";
       profileKeywords.seaceCallYear = normalizeSeaceYear(profile.seaceCallYear);
       console.log('Profile loaded:', profileKeywords);
     }
@@ -794,6 +798,14 @@ async function openSeaceFilterModal() {
     seaceContractObjectModal.value = currentProfile?.seaceContractObject || profileKeywords.seaceContractObject || "";
   }
 
+  if (seaceEntityAcronymModal) {
+    seaceEntityAcronymModal.value = currentProfile?.seaceEntityAcronym || profileKeywords.seaceEntityAcronym || "";
+  }
+
+  if (seaceDepartmentModal) {
+    seaceDepartmentModal.value = currentProfile?.seaceDepartment || profileKeywords.seaceDepartment || "";
+  }
+
   if (seaceCallYearModal) {
     seaceCallYearModal.value = String(normalizeSeaceYear(currentProfile?.seaceCallYear || profileKeywords.seaceCallYear));
   }
@@ -830,6 +842,8 @@ function buildUpdatedProfile() {
     excludedKeywords: currentProfile?.excludedKeywords || profileKeywords.excluded || [],
     seaceObjectDescription: seaceObjectDescriptionModal?.value.trim() || "",
     seaceContractObject: seaceContractObjectModal?.value || "",
+    seaceEntityAcronym: seaceEntityAcronymModal?.value.trim() || "",
+    seaceDepartment: seaceDepartmentModal?.value || "",
     seaceCallYear: normalizeSeaceYear(seaceCallYearModal?.value || currentYear),
     minDaysToClose: currentProfile?.minDaysToClose || 3,
     maxDaysToClose: currentProfile?.maxDaysToClose || 30,
@@ -863,6 +877,8 @@ async function saveSeaceFilter() {
     currentProfile = await response.json();
     profileKeywords.seaceObjectDescription = currentProfile.seaceObjectDescription || "";
     profileKeywords.seaceContractObject = currentProfile.seaceContractObject || "";
+    profileKeywords.seaceEntityAcronym = currentProfile.seaceEntityAcronym || "";
+    profileKeywords.seaceDepartment = currentProfile.seaceDepartment || "";
     profileKeywords.seaceCallYear = normalizeSeaceYear(currentProfile.seaceCallYear);
     setMessage("Filtro SEACE guardado.");
     return true;
@@ -1480,7 +1496,7 @@ function renderOpportunityDetail(item) {
   }
 
   if (detailHeading) {
-    detailHeading.textContent = `${item.processCode} | ${item.title}`;
+    detailHeading.textContent = getOpportunityDisplayTitle(item);
   }
 
   if (detailInsightTitle) {
@@ -1592,12 +1608,121 @@ function renderSeaceFields(detailJson) {
     return;
   }
 
-  detailSeaceFields.innerHTML = entries.map(([key, value]) => `
+  const usedKeys = new Set();
+  const groups = [
+    {
+      title: "Informacion general",
+      labels: [
+        "Nomenclatura",
+        "Nro Convocatoria",
+        "N Convocatoria",
+        "Tipo Compra o Seleccion",
+        "Tipo Compra",
+        "Normativa Aplicable",
+        "Version SEACE"
+      ]
+    },
+    {
+      title: "Informacion general de la Entidad",
+      labels: [
+        "Entidad Convocante",
+        "Direccion Legal",
+        "Pagina Web",
+        "Telefono de la Entidad"
+      ]
+    },
+    {
+      title: "Informacion general del procedimiento",
+      labels: [
+        "Objeto de Contratacion",
+        "Descripcion del Objeto",
+        "VR / VE / Cuantia",
+        "Monto del Derecho de Participacion",
+        "Monto del costo de Reproduccion de las Bases",
+        "Fecha y Hora Publicacion"
+      ]
+    }
+  ];
+
+  const groupMarkup = groups.map(group => {
+    const usedGroupAliases = new Set();
+    const rows = [];
+
+    group.labels.forEach(label => {
+      const entry = findSeaceEntry(entries, label);
+      if (!entry) {
+        return;
+      }
+
+      const [key, value] = entry;
+      const alias = getSeaceLabelAlias(normalizeComparableText(key));
+      if (usedKeys.has(key) || usedGroupAliases.has(alias)) {
+        return;
+      }
+
+      usedKeys.add(key);
+      usedGroupAliases.add(alias);
+      rows.push(renderSeaceFieldItem(key, value));
+    });
+
+    if (rows.length === 0) {
+      return "";
+    }
+
+    return `
+      <section class="seace-field-section">
+        <h4>${escapeHtml(group.title)}</h4>
+        <div class="seace-field-section-grid">
+          ${rows.join("")}
+        </div>
+      </section>
+    `;
+  }).join("");
+
+  const extraRows = entries
+    .filter(([key]) => !usedKeys.has(key))
+    .map(([key, value]) => renderSeaceFieldItem(key, value));
+
+  detailSeaceFields.innerHTML = groupMarkup + (extraRows.length > 0 ? `
+    <section class="seace-field-section">
+      <h4>Otros datos</h4>
+      <div class="seace-field-section-grid">
+        ${extraRows.join("")}
+      </div>
+    </section>
+  ` : "");
+}
+
+function findSeaceEntry(entries, label) {
+  const normalizedLabel = normalizeComparableText(label);
+  return entries.find(([key]) => {
+    const normalizedKey = normalizeComparableText(key);
+    return normalizedKey.includes(normalizedLabel) ||
+      normalizedLabel.includes(normalizedKey) ||
+      getSeaceLabelAlias(normalizedKey) === getSeaceLabelAlias(normalizedLabel);
+  });
+}
+
+function getSeaceLabelAlias(value) {
+  return String(value || "")
+    .replace(/°/g, "")
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^n(ro)?\s*convocatoria$/, "convocatoria")
+    .replace(/^n\s*convocatoria$/, "convocatoria")
+    .replace(/^tipo compra$/, "tipo compra o seleccion")
+    .replace(/^tipo compra seleccion$/, "tipo compra o seleccion")
+    .replace(/^version seace$/, "version seace");
+}
+
+function renderSeaceFieldItem(key, value) {
+  return `
     <div class="seace-field-item">
       <span>${escapeHtml(key)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
-  `).join("");
+  `;
 }
 
 function getActiveFilterValue(groupName) {
@@ -1658,6 +1783,7 @@ function createOpportunityMarkup(item, index) {
     `<span class="recommendation-keyword">${escapeHtml(keyword)}</span>`
   ).join('');
   const recommendationReason = item.recommendationReason || 'Recomendacion calculada con tus palabras clave y preferencias.';
+  const displayTitle = getOpportunityDisplayTitle(item);
 
   // Calcular número correlativo
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1669,7 +1795,7 @@ function createOpportunityMarkup(item, index) {
         <div>
           <h4>
             <span class="card-indicator">${lineNumber}</span>
-            ${escapeHtml(item.processCode)} | ${escapeHtml(item.title)}
+            ${escapeHtml(displayTitle)}
             ${urgencyChip}
           </h4>
           <p>${escapeHtml(item.entityName)}</p>
@@ -1757,6 +1883,26 @@ function formatDate(value) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+function getOpportunityDisplayTitle(item) {
+  const processCode = String(item?.processCode || "").trim();
+  const title = String(item?.title || "").trim();
+
+  if (!title || normalizeComparableText(title) === normalizeComparableText(processCode)) {
+    return processCode || title;
+  }
+
+  return processCode ? `${processCode} | ${title}` : title;
+}
+
+function normalizeComparableText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function escapeHtml(value) {

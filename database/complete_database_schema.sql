@@ -76,6 +76,8 @@ BEGIN
         SeaceObjectDescription NVARCHAR(500) NOT NULL DEFAULT '',
         SeaceCallYear INT NOT NULL DEFAULT (YEAR(GETDATE())),
         SeaceContractObject NVARCHAR(50) NOT NULL DEFAULT '',
+        SeaceEntityAcronym NVARCHAR(100) NOT NULL DEFAULT '',
+        SeaceDepartment NVARCHAR(100) NOT NULL DEFAULT '',
         MinDaysToClose INT NOT NULL DEFAULT 3,
         MaxDaysToClose INT NOT NULL DEFAULT 30,
         IdealDaysToClose INT NOT NULL DEFAULT 15,
@@ -213,7 +215,7 @@ GO
 -- Insertar perfil por defecto para sistema
 IF NOT EXISTS (SELECT 1 FROM dbo.CompanyProfile WHERE CompanyName = 'Default')
 BEGIN
-    INSERT INTO dbo.CompanyProfile (UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, CreatedAtUtc, UpdatedAtUtc)
+    INSERT INTO dbo.CompanyProfile (UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, SeaceEntityAcronym, SeaceDepartment, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, CreatedAtUtc, UpdatedAtUtc)
     VALUES (
         (SELECT TOP 1 UserId FROM dbo.AppUsers WHERE RoleName = 'Administrator'),
         'Default',
@@ -229,6 +231,8 @@ BEGIN
         '[]',
         '',
         YEAR(GETDATE()),
+        '',
+        '',
         '',
         3,
         30,

@@ -36,6 +36,10 @@ public sealed record CompanyProfile
 
     public string SeaceContractObject { get; init; } = string.Empty;
 
+    public string SeaceEntityAcronym { get; init; } = string.Empty;
+
+    public string SeaceDepartment { get; init; } = string.Empty;
+
     public int MinDaysToClose { get; init; } = 3;
 
     public int MaxDaysToClose { get; init; } = 30;

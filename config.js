@@ -87,6 +87,16 @@ function populateForm(profile) {
     seaceContractObjectInput.value = profile.seaceContractObject || '';
   }
 
+  const seaceEntityAcronymInput = document.getElementById('seaceEntityAcronym');
+  if (seaceEntityAcronymInput) {
+    seaceEntityAcronymInput.value = profile.seaceEntityAcronym || '';
+  }
+
+  const seaceDepartmentInput = document.getElementById('seaceDepartment');
+  if (seaceDepartmentInput) {
+    seaceDepartmentInput.value = profile.seaceDepartment || '';
+  }
+
   preferredKeywords = profile.preferredKeywords || [];
   excludedKeywords = profile.excludedKeywords || [];
   renderKeywords();
@@ -333,6 +343,14 @@ function getFormData() {
   const seaceContractObject = seaceContractObjectInput
     ? seaceContractObjectInput.value
     : currentProfile?.seaceContractObject || '';
+  const seaceEntityAcronymInput = document.getElementById('seaceEntityAcronym');
+  const seaceEntityAcronym = seaceEntityAcronymInput
+    ? seaceEntityAcronymInput.value.trim()
+    : currentProfile?.seaceEntityAcronym || '';
+  const seaceDepartmentInput = document.getElementById('seaceDepartment');
+  const seaceDepartment = seaceDepartmentInput
+    ? seaceDepartmentInput.value
+    : currentProfile?.seaceDepartment || '';
 
   return {
     companyName: companyName || 'Default',
@@ -349,6 +367,8 @@ function getFormData() {
     seaceObjectDescription,
     seaceCallYear,
     seaceContractObject,
+    seaceEntityAcronym,
+    seaceDepartment,
     minDaysToClose: currentProfile?.minDaysToClose || 3,
     maxDaysToClose: currentProfile?.maxDaysToClose || 30,
     idealDaysToClose: currentProfile?.idealDaysToClose || 15

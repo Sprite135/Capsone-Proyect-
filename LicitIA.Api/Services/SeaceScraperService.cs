@@ -23,14 +23,16 @@ public class SeaceScraperService
         CancellationToken cancellationToken = default,
         string? objectDescription = null,
         int? callYear = null,
-        string? contractObject = null)
+        string? contractObject = null,
+        string? entityAcronym = null,
+        string? department = null)
     {
         try
         {
             Console.WriteLine("[SeaceScraper] Iniciando scraping con Playwright...");
 
             // Usar Playwright para scraping de SEACE
-            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear, contractObject);
+            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear, contractObject, entityAcronym, department);
 
             if (opportunities.Count > 0)
             {
@@ -50,7 +52,7 @@ public class SeaceScraperService
         }
     }
 
-    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear, string? contractObject)
+    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear, string? contractObject, string? entityAcronym, string? department)
     {
         var opportunities = new List<ScrapedOpportunity>();
 
@@ -102,6 +104,8 @@ public class SeaceScraperService
 
             await ApplyCallYearFilterAsync(page, callYear);
             await ApplyContractObjectFilterAsync(page, contractObject);
+            await ApplyEntityAcronymFilterAsync(page, entityAcronym);
+            await ApplyDepartmentFilterAsync(page, department);
             await ApplyObjectDescriptionFilterAsync(page, objectDescription);
 
             Console.WriteLine("[SeaceScraper] Esperando botón 'Buscar'...");
@@ -1308,6 +1312,144 @@ public class SeaceScraperService
             "servicio" => "Servicio",
             _ => string.Empty
         };
+    }
+
+    private async Task ApplyEntityAcronymFilterAsync(IPage page, string? entityAcronym)
+    {
+        if (string.IsNullOrWhiteSpace(entityAcronym))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtro avanzado Sigla/Nomenclatura configurado.");
+            return;
+        }
+
+        var value = entityAcronym.Trim();
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro avanzado Sigla/Nomenclatura: {value}");
+
+        try
+        {
+            const string selector = "#tbBuscador\\:idFormBuscarProceso\\:siglasEntidad";
+            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var input = await page.QuerySelectorAsync(selector);
+            if (input != null)
+            {
+                await input.FillAsync(value);
+                Console.WriteLine("[SeaceScraper] Filtro avanzado Sigla/Nomenclatura escrito en el formulario.");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo llenar siglasEntidad con selector directo: {ex.Message}");
+        }
+
+        try
+        {
+            var applied = await page.EvaluateAsync<bool>(
+                @"(value) => {
+                    const input = document.getElementById('tbBuscador:idFormBuscarProceso:siglasEntidad');
+                    if (!input) return false;
+
+                    input.value = value;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }",
+                value);
+
+            Console.WriteLine(applied
+                ? "[SeaceScraper] Filtro avanzado Sigla/Nomenclatura escrito por JavaScript."
+                : "[SeaceScraper] No se encontro el input siglasEntidad.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] Error aplicando filtro avanzado Sigla/Nomenclatura: {ex.Message}");
+        }
+    }
+
+    private async Task ApplyDepartmentFilterAsync(IPage page, string? department)
+    {
+        if (string.IsNullOrWhiteSpace(department))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtro avanzado Departamento configurado.");
+            return;
+        }
+
+        var optionText = department.Trim();
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro avanzado Departamento: {optionText}");
+
+        try
+        {
+            const string labelSelector = "#tbBuscador\\:idFormBuscarProceso\\:departamento_label";
+            const string panelSelector = "#tbBuscador\\:idFormBuscarProceso\\:departamento_panel";
+
+            await page.WaitForSelectorAsync(labelSelector, new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var opened = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const root = document.getElementById('tbBuscador:idFormBuscarProceso:departamento');
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:departamento_label');
+                    const trigger = root?.querySelector('.ui-selectonemenu-trigger');
+                    const clickable = trigger || label || root;
+                    if (!clickable) return false;
+
+                    clickable.click();
+                    return true;
+                }");
+
+            Console.WriteLine(opened
+                ? "[SeaceScraper] Combo Departamento abierto."
+                : "[SeaceScraper] No se pudo abrir el combo departamento.");
+
+            await page.WaitForSelectorAsync($"{panelSelector} li.ui-selectonemenu-item", new PageWaitForSelectorOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10000
+            });
+
+            var selected = await page.EvaluateAsync<bool>(
+                @"(optionText) => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const panel = document.getElementById('tbBuscador:idFormBuscarProceso:departamento_panel');
+                    if (!panel) return false;
+
+                    const target = normalize(optionText);
+                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item'));
+                    const option = items.find(item => {
+                        const value = normalize(item.getAttribute('data-label') || item.textContent);
+                        return value === target;
+                    });
+                    if (!option) return false;
+
+                    option.click();
+                    return true;
+                }",
+                optionText);
+
+            if (selected)
+            {
+                await Task.Delay(500);
+                var selectedLabel = await page.TextContentAsync(labelSelector);
+                Console.WriteLine($"[SeaceScraper] Departamento seleccionado en UI: {selectedLabel}");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Departamento desde el combo visible: {ex.Message}");
+        }
     }
 
     private async Task ApplyObjectDescriptionFilterAsync(IPage page, string? objectDescription)

@@ -2098,6 +2098,17 @@ td,
   padding: 24px;
 }
 
+.modal-subsection {
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.modal-subsection h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
 .modal-actions {
   justify-content: flex-end;
   border-top: 1px solid var(--line);
@@ -2167,9 +2178,29 @@ td,
 
 .seace-field-list {
   display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.seace-field-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(7, 18, 32, 0.45);
+}
+
+.seace-field-section h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.seace-field-section-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 12px;
 }
 
 .schedule-item,
@@ -2629,7 +2660,7 @@ button:disabled,
   .result-meta,
   .detail-meta,
   .seace-detail-grid,
-  .seace-field-list,
+  .seace-field-section-grid,
   .mini-stats,
   .builder-grid {
     grid-template-columns: 1fr;
