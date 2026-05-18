@@ -82,6 +82,11 @@ function populateForm(profile) {
     seaceCallYearInput.value = String(normalizeSeaceYear(profile.seaceCallYear));
   }
 
+  const seaceContractObjectInput = document.getElementById('seaceContractObject');
+  if (seaceContractObjectInput) {
+    seaceContractObjectInput.value = profile.seaceContractObject || '';
+  }
+
   preferredKeywords = profile.preferredKeywords || [];
   excludedKeywords = profile.excludedKeywords || [];
   renderKeywords();
@@ -319,9 +324,15 @@ function getFormData() {
   const companyNameInput = document.getElementById('companyName');
   const companyName = companyNameInput ? companyNameInput.value.trim() : 'Default';
   const seaceObjectDescriptionInput = document.getElementById('seaceObjectDescription');
-  const seaceObjectDescription = seaceObjectDescriptionInput ? seaceObjectDescriptionInput.value.trim() : '';
+  const seaceObjectDescription = seaceObjectDescriptionInput
+    ? seaceObjectDescriptionInput.value.trim()
+    : currentProfile?.seaceObjectDescription || '';
   const seaceCallYearInput = document.getElementById('seaceCallYear');
-  const seaceCallYear = normalizeSeaceYear(seaceCallYearInput ? Number(seaceCallYearInput.value) : null);
+  const seaceCallYear = normalizeSeaceYear(seaceCallYearInput ? Number(seaceCallYearInput.value) : currentProfile?.seaceCallYear);
+  const seaceContractObjectInput = document.getElementById('seaceContractObject');
+  const seaceContractObject = seaceContractObjectInput
+    ? seaceContractObjectInput.value
+    : currentProfile?.seaceContractObject || '';
 
   return {
     companyName: companyName || 'Default',
@@ -337,6 +348,7 @@ function getFormData() {
     excludedKeywords: excludedKeywords || [],
     seaceObjectDescription,
     seaceCallYear,
+    seaceContractObject,
     minDaysToClose: currentProfile?.minDaysToClose || 3,
     maxDaysToClose: currentProfile?.maxDaysToClose || 30,
     idealDaysToClose: currentProfile?.idealDaysToClose || 15

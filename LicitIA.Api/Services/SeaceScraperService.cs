@@ -22,14 +22,15 @@ public class SeaceScraperService
         int maxResults = 30,
         CancellationToken cancellationToken = default,
         string? objectDescription = null,
-        int? callYear = null)
+        int? callYear = null,
+        string? contractObject = null)
     {
         try
         {
             Console.WriteLine("[SeaceScraper] Iniciando scraping con Playwright...");
 
             // Usar Playwright para scraping de SEACE
-            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear);
+            var opportunities = await ScrapeWithPlaywright(maxResults, cancellationToken, objectDescription, callYear, contractObject);
 
             if (opportunities.Count > 0)
             {
@@ -49,7 +50,7 @@ public class SeaceScraperService
         }
     }
 
-    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear)
+    private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear, string? contractObject)
     {
         var opportunities = new List<ScrapedOpportunity>();
 
@@ -100,6 +101,7 @@ public class SeaceScraperService
             }
 
             await ApplyCallYearFilterAsync(page, callYear);
+            await ApplyContractObjectFilterAsync(page, contractObject);
             await ApplyObjectDescriptionFilterAsync(page, objectDescription);
 
             Console.WriteLine("[SeaceScraper] Esperando botón 'Buscar'...");
@@ -206,7 +208,9 @@ public class SeaceScraperService
                                         var cellData = new string[Math.Min(cells.Count, 12)];
                                         for (int j = 0; j < cellData.Length; j++)
                                         {
-                                            cellData[j] = (await cells[j].TextContentAsync())?.Trim() ?? "";
+                                            cellData[j] = j == 6
+                                                ? await GetBestCellTextAsync(cells[j])
+                                                : (await cells[j].TextContentAsync())?.Trim() ?? "";
                                         }
 
                                         var publishedDate = ParseSeaceDate(cellData[2]);
@@ -596,6 +600,36 @@ public class SeaceScraperService
             }");
     }
 
+    private static async Task<string> GetBestCellTextAsync(IElementHandle cell)
+    {
+        return await cell.EvaluateAsync<string>(
+            @"cell => {
+                const candidates = [
+                    cell.innerText,
+                    cell.textContent,
+                    cell.getAttribute('title'),
+                    cell.getAttribute('aria-label'),
+                    cell.getAttribute('data-title'),
+                    cell.getAttribute('data-tooltip')
+                ];
+
+                const nested = Array.from(cell.querySelectorAll('[title], [aria-label], [data-title], [data-tooltip]'));
+                for (const item of nested) {
+                    candidates.push(item.getAttribute('title'));
+                    candidates.push(item.getAttribute('aria-label'));
+                    candidates.push(item.getAttribute('data-title'));
+                    candidates.push(item.getAttribute('data-tooltip'));
+                    candidates.push(item.innerText);
+                    candidates.push(item.textContent);
+                }
+
+                const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
+                const values = candidates.map(clean).filter(Boolean);
+                values.sort((a, b) => b.length - a.length);
+                return values[0] || '';
+            }");
+    }
+
     private static async Task<int> GetFirstVisibleResultRowIndexAsync(IPage page)
     {
         return await page.EvaluateAsync<int>(
@@ -916,9 +950,9 @@ public class SeaceScraperService
         opportunity.BasesReproductionCost = ReadDetail(details, "Monto del costo de Reproduccion de las Bases", opportunity.BasesReproductionCost);
 
         var description = ReadDetail(details, "Descripcion del Objeto", string.Empty);
-        if (!string.IsNullOrWhiteSpace(description))
+        if (IsBetterDescription(description, opportunity.Description))
         {
-            opportunity.Description = description;
+            opportunity.Description = description.Trim();
         }
 
         var amountText = ReadDetail(details, "VR / VE / Cuantia", string.Empty);
@@ -940,6 +974,34 @@ public class SeaceScraperService
             normalizedLabel.Contains(NormalizeLabel(item.Key), StringComparison.OrdinalIgnoreCase));
 
         return string.IsNullOrWhiteSpace(match.Value) ? fallback : match.Value.Trim();
+    }
+
+    private static bool IsBetterDescription(string candidate, string current)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(current))
+        {
+            return true;
+        }
+
+        var trimmedCandidate = candidate.Trim();
+        var trimmedCurrent = current.Trim();
+        if (LooksTruncated(trimmedCandidate) && !LooksTruncated(trimmedCurrent))
+        {
+            return false;
+        }
+
+        return trimmedCandidate.Length > trimmedCurrent.Length;
+    }
+
+    private static bool LooksTruncated(string value)
+    {
+        return value.Contains("...", StringComparison.Ordinal) ||
+            value.Contains("…", StringComparison.Ordinal);
     }
 
     private static string NormalizeLabel(string value)
@@ -1088,6 +1150,164 @@ public class SeaceScraperService
         {
             Console.WriteLine($"[SeaceScraper] Error aplicando filtro Anio de Convocatoria: {ex.Message}");
         }
+    }
+
+    private async Task ApplyContractObjectFilterAsync(IPage page, string? contractObject)
+    {
+        var optionText = NormalizeContractObjectOption(contractObject);
+        if (string.IsNullOrWhiteSpace(optionText))
+        {
+            Console.WriteLine("[SeaceScraper] Sin filtro de Objeto de Contratacion configurado.");
+            return;
+        }
+
+        Console.WriteLine($"[SeaceScraper] Aplicando filtro Objeto de Contratacion: {optionText}");
+
+        try
+        {
+            const string labelSelector = "#tbBuscador\\:idFormBuscarProceso\\:j_idt188_label";
+            const string panelSelector = "#tbBuscador\\:idFormBuscarProceso\\:j_idt188_panel";
+
+            await page.WaitForSelectorAsync(labelSelector, new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var opened = await page.EvaluateAsync<bool>(
+                @"() => {
+                    const root = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt188');
+                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt188_label');
+                    const trigger = root?.querySelector('.ui-selectonemenu-trigger');
+                    const clickable = trigger || label || root;
+                    if (!clickable) return false;
+
+                    clickable.click();
+                    return true;
+                }");
+
+            Console.WriteLine(opened
+                ? "[SeaceScraper] Combo Objeto de Contratacion abierto."
+                : "[SeaceScraper] No se pudo abrir el combo j_idt188 de Objeto de Contratacion.");
+
+            await page.WaitForSelectorAsync($"{panelSelector} li.ui-selectonemenu-item", new PageWaitForSelectorOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10000
+            });
+
+            var selectedByKnownId = await page.EvaluateAsync<bool>(
+                @"(optionText) => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const panel = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt188_panel');
+                    if (!panel) return false;
+
+                    const target = normalize(optionText);
+                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item'));
+                    const option = items.find(item => normalize(item.getAttribute('data-label') || item.textContent) === target);
+                    if (!option) return false;
+
+                    option.click();
+                    return true;
+                }",
+                optionText);
+
+            if (selectedByKnownId)
+            {
+                await Task.Delay(500);
+                var selectedLabel = await page.TextContentAsync(labelSelector);
+                Console.WriteLine($"[SeaceScraper] Objeto de Contratacion seleccionado en UI: {selectedLabel}");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Objeto de Contratacion con j_idt188: {ex.Message}");
+        }
+
+        try
+        {
+            var selected = await page.EvaluateAsync<bool>(
+                @"(optionText) => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const target = normalize(optionText);
+                    const directIds = [
+                        'tbBuscador:idFormBuscarProceso:j_idt188',
+                        'tbBuscador:idFormBuscarProceso:objetoContratacion',
+                        'tbBuscador:idFormBuscarProceso:objetoContrato',
+                        'tbBuscador:idFormBuscarProceso:tipoObjetoContratacion'
+                    ];
+
+                    let root = directIds.map(id => document.getElementById(id)).find(Boolean);
+                    if (!root) {
+                        const labels = Array.from(document.querySelectorAll('label, td, th, span, div'))
+                            .filter(el => normalize(el.textContent).includes('objeto de contratacion'));
+
+                        for (const label of labels) {
+                            const row = label.closest('tr') || label.parentElement;
+                            root = row?.querySelector('.ui-selectonemenu') ||
+                                row?.nextElementSibling?.querySelector?.('.ui-selectonemenu');
+                            if (root) break;
+                        }
+                    }
+
+                    if (!root) return false;
+
+                    const rootId = root.id;
+                    const label = document.getElementById(rootId + '_label') || root.querySelector('.ui-selectonemenu-label');
+                    const trigger = root.querySelector('.ui-selectonemenu-trigger');
+                    (trigger || label || root).click();
+
+                    const panels = Array.from(document.querySelectorAll('.ui-selectonemenu-panel'));
+                    const panel = document.getElementById(rootId + '_panel') ||
+                        panels.reverse().find(item => item.offsetParent !== null) ||
+                        panels[0];
+                    if (!panel) return false;
+
+                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item, li'));
+                    const option = items.find(item => normalize(item.getAttribute('data-label') || item.textContent) === target);
+                    if (!option) return false;
+
+                    option.click();
+                    return true;
+                }",
+                optionText);
+
+            if (selected)
+            {
+                await Task.Delay(500);
+                Console.WriteLine("[SeaceScraper] Objeto de Contratacion seleccionado en UI por fallback.");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] Error aplicando filtro Objeto de Contratacion: {ex.Message}");
+        }
+    }
+
+    private static string NormalizeContractObjectOption(string? value)
+    {
+        var normalized = NormalizeLabel(value ?? string.Empty).ToLowerInvariant();
+        return normalized switch
+        {
+            "bien" => "Bien",
+            "consultoria de obra" => "Consultor\u00eda de Obra",
+            "obra" => "Obra",
+            "servicio" => "Servicio",
+            _ => string.Empty
+        };
     }
 
     private async Task ApplyObjectDescriptionFilterAsync(IPage page, string? objectDescription)

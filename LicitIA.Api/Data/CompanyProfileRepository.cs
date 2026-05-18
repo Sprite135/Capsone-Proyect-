@@ -32,7 +32,7 @@ public class CompanyProfileRepository
             const string sql =@"
                 SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                        MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                       PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                       PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                        CreatedAtUtc, UpdatedAtUtc
                 FROM dbo.CompanyProfile
                 WHERE UserId = @UserId;";
@@ -75,7 +75,7 @@ public class CompanyProfileRepository
         const string sql = @"
             SELECT TOP 1 ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                    MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                    CreatedAtUtc, UpdatedAtUtc
             FROM dbo.CompanyProfile
             WHERE UserId IS NULL
@@ -100,7 +100,7 @@ public class CompanyProfileRepository
         const string sql = @"
             SELECT ProfileId, UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                    MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
+                   PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, MinDaysToClose, MaxDaysToClose, IdealDaysToClose,
                    CreatedAtUtc, UpdatedAtUtc
             FROM dbo.CompanyProfile
             WHERE UserId IS NOT NULL
@@ -126,12 +126,12 @@ public class CompanyProfileRepository
         const string sql = @"
             INSERT INTO dbo.CompanyProfile (UserId, CompanyName, PreferredCategories, PreferredLocations, PreferredModalities, 
                                             MinAmount, MaxAmount, IdealAmount, FavoriteEntities, ExcludedEntities, 
-                                            PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, 
+                                            PreferredKeywords, ExcludedKeywords, SeaceObjectDescription, SeaceCallYear, SeaceContractObject, MinDaysToClose, MaxDaysToClose, IdealDaysToClose, 
                                             CreatedAtUtc, UpdatedAtUtc)
             OUTPUT INSERTED.ProfileId
             VALUES (@UserId, @CompanyName, @PreferredCategories, @PreferredLocations, @PreferredModalities,
                     @MinAmount, @MaxAmount, @IdealAmount, @FavoriteEntities, @ExcludedEntities, 
-                    @PreferredKeywords, @ExcludedKeywords, @SeaceObjectDescription, @SeaceCallYear, @MinDaysToClose, @MaxDaysToClose, @IdealDaysToClose,
+                    @PreferredKeywords, @ExcludedKeywords, @SeaceObjectDescription, @SeaceCallYear, @SeaceContractObject, @MinDaysToClose, @MaxDaysToClose, @IdealDaysToClose,
                     GETUTCDATE(), GETUTCDATE());";
 
         await using var command = new SqlCommand(sql, connection);
@@ -149,6 +149,7 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@ExcludedKeywords", JsonSerializer.Serialize(profile.ExcludedKeywords));
         command.Parameters.AddWithValue("@SeaceObjectDescription", profile.SeaceObjectDescription.Trim());
         command.Parameters.AddWithValue("@SeaceCallYear", NormalizeSeaceCallYear(profile.SeaceCallYear));
+        command.Parameters.AddWithValue("@SeaceContractObject", NormalizeSeaceContractObject(profile.SeaceContractObject));
         command.Parameters.AddWithValue("@MinDaysToClose", profile.MinDaysToClose);
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
@@ -177,6 +178,7 @@ public class CompanyProfileRepository
                 ExcludedKeywords = @ExcludedKeywords,
                 SeaceObjectDescription = @SeaceObjectDescription,
                 SeaceCallYear = @SeaceCallYear,
+                SeaceContractObject = @SeaceContractObject,
                 MinDaysToClose = @MinDaysToClose,
                 MaxDaysToClose = @MaxDaysToClose,
                 IdealDaysToClose = @IdealDaysToClose,
@@ -200,6 +202,7 @@ public class CompanyProfileRepository
         command.Parameters.AddWithValue("@ExcludedKeywords", JsonSerializer.Serialize(profile.ExcludedKeywords));
         command.Parameters.AddWithValue("@SeaceObjectDescription", profile.SeaceObjectDescription.Trim());
         command.Parameters.AddWithValue("@SeaceCallYear", NormalizeSeaceCallYear(profile.SeaceCallYear));
+        command.Parameters.AddWithValue("@SeaceContractObject", NormalizeSeaceContractObject(profile.SeaceContractObject));
         command.Parameters.AddWithValue("@MinDaysToClose", profile.MinDaysToClose);
         command.Parameters.AddWithValue("@MaxDaysToClose", profile.MaxDaysToClose);
         command.Parameters.AddWithValue("@IdealDaysToClose", profile.IdealDaysToClose);
@@ -246,6 +249,7 @@ public class CompanyProfileRepository
             ExcludedKeywords = DeserializeList<List<string>>("ExcludedKeywords"),
             SeaceObjectDescription = reader.IsDBNull(reader.GetOrdinal("SeaceObjectDescription")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceObjectDescription")),
             SeaceCallYear = reader.IsDBNull(reader.GetOrdinal("SeaceCallYear")) ? DateTime.UtcNow.Year : reader.GetInt32(reader.GetOrdinal("SeaceCallYear")),
+            SeaceContractObject = reader.IsDBNull(reader.GetOrdinal("SeaceContractObject")) ? string.Empty : reader.GetString(reader.GetOrdinal("SeaceContractObject")),
             MinDaysToClose = reader.GetInt32(reader.GetOrdinal("MinDaysToClose")),
             MaxDaysToClose = reader.GetInt32(reader.GetOrdinal("MaxDaysToClose")),
             IdealDaysToClose = reader.GetInt32(reader.GetOrdinal("IdealDaysToClose")),
@@ -258,5 +262,13 @@ public class CompanyProfileRepository
     {
         var currentYear = DateTime.UtcNow.Year;
         return year >= 2004 && year <= currentYear ? year : currentYear;
+    }
+
+    private static string NormalizeSeaceContractObject(string? value)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        return normalized is "Bien" or "Consultoría de Obra" or "Consultoria de Obra" or "Obra" or "Servicio"
+            ? normalized
+            : string.Empty;
     }
 }

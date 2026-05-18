@@ -61,4 +61,10 @@ BEGIN
     PRINT 'Added: SeaceCallYear';
 END
 
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CompanyProfile') AND name = 'SeaceContractObject')
+BEGIN
+    ALTER TABLE dbo.CompanyProfile ADD SeaceContractObject NVARCHAR(50) NOT NULL DEFAULT '';
+    PRINT 'Added: SeaceContractObject';
+END
+
 PRINT 'Migration completed successfully.';

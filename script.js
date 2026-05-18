@@ -32,6 +32,13 @@ const detailBasesCost = document.getElementById("detailBasesCost");
 const detailScheduleList = document.getElementById("detailScheduleList");
 const detailSeaceFields = document.getElementById("detailSeaceFields");
 const syncSeaceButton = document.getElementById('syncSeaceButton');
+const seaceFilterModal = document.getElementById("seaceFilterModal");
+const closeSeaceFilterModal = document.getElementById("closeSeaceFilterModal");
+const saveSeaceFilterButton = document.getElementById("saveSeaceFilterButton");
+const runSeaceFilterButton = document.getElementById("runSeaceFilterButton");
+const seaceObjectDescriptionModal = document.getElementById("seaceObjectDescriptionModal");
+const seaceContractObjectModal = document.getElementById("seaceContractObjectModal");
+const seaceCallYearModal = document.getElementById("seaceCallYearModal");
 const runAiAnalysisButton = document.getElementById("runAiAnalysisButton");
 const aiAnalysisList = document.getElementById("aiAnalysisList");
 const aiStatusText = document.getElementById("aiStatusText");
@@ -41,7 +48,8 @@ let allOpportunities = [];
 let currentPage = 1;
 const itemsPerPage = 15;
 let lastFilteredCount = 0;
-let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "" };
+let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "", seaceContractObject: "", seaceCallYear: new Date().getFullYear() };
+let currentProfile = null;
 let currentDetailOpportunityId = null;
 
 function handleOAuthRedirect() {
@@ -77,6 +85,13 @@ handleOAuthRedirect();
 function getAuthHeaders() {
   const token = localStorage.getItem("authToken");
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getJsonAuthHeaders() {
+  return {
+    ...getAuthHeaders(),
+    "Content-Type": "application/json"
+  };
 }
 
 const setMessage = (text) => {
@@ -155,6 +170,45 @@ if (syncSeaceButton) {
   });
 } else {
   console.log("Botón syncSeaceButton NO encontrado");
+}
+
+if (syncSeaceButton) {
+  syncSeaceButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openSeaceFilterModal();
+  }, true);
+}
+
+if (closeSeaceFilterModal) {
+  closeSeaceFilterModal.addEventListener("click", closeSeaceModal);
+}
+
+if (seaceFilterModal) {
+  seaceFilterModal.addEventListener("click", (event) => {
+    if (event.target === seaceFilterModal) {
+      closeSeaceModal();
+    }
+  });
+}
+
+if (saveSeaceFilterButton) {
+  saveSeaceFilterButton.addEventListener("click", async () => {
+    const saved = await saveSeaceFilter();
+    if (saved) {
+      closeSeaceModal();
+    }
+  });
+}
+
+if (runSeaceFilterButton) {
+  runSeaceFilterButton.addEventListener("click", async () => {
+    const saved = await saveSeaceFilter();
+    if (saved) {
+      closeSeaceModal();
+      await syncSeace();
+    }
+  });
 }
 
 chips.forEach((chip) => {
@@ -674,9 +728,12 @@ async function loadProfile() {
     });
     if (response.ok) {
       const profile = await response.json();
+      currentProfile = profile;
       profileKeywords.preferred = profile.preferredKeywords || [];
       profileKeywords.excluded = profile.excludedKeywords || [];
       profileKeywords.seaceObjectDescription = profile.seaceObjectDescription || "";
+      profileKeywords.seaceContractObject = profile.seaceContractObject || "";
+      profileKeywords.seaceCallYear = normalizeSeaceYear(profile.seaceCallYear);
       console.log('Profile loaded:', profileKeywords);
     }
   } catch (error) {
@@ -698,6 +755,157 @@ function highlightKeywords(text, keywords) {
 
 function escapeRegex(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function populateSeaceYearOptions(selectElement) {
+  if (!selectElement) {
+    return;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let year = currentYear; year >= 2004; year -= 1) {
+    years.push(`<option value="${year}">${year}</option>`);
+  }
+
+  selectElement.innerHTML = years.join("");
+}
+
+function normalizeSeaceYear(value) {
+  const currentYear = new Date().getFullYear();
+  const year = Number(value);
+  return Number.isInteger(year) && year >= 2004 && year <= currentYear ? year : currentYear;
+}
+
+async function openSeaceFilterModal() {
+  if (!seaceFilterModal) {
+    await syncSeace();
+    return;
+  }
+
+  populateSeaceYearOptions(seaceCallYearModal);
+  await loadProfile();
+
+  if (seaceObjectDescriptionModal) {
+    seaceObjectDescriptionModal.value = currentProfile?.seaceObjectDescription || profileKeywords.seaceObjectDescription || "";
+  }
+
+  if (seaceContractObjectModal) {
+    seaceContractObjectModal.value = currentProfile?.seaceContractObject || profileKeywords.seaceContractObject || "";
+  }
+
+  if (seaceCallYearModal) {
+    seaceCallYearModal.value = String(normalizeSeaceYear(currentProfile?.seaceCallYear || profileKeywords.seaceCallYear));
+  }
+
+  seaceFilterModal.classList.add("active");
+  seaceFilterModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  seaceObjectDescriptionModal?.focus();
+}
+
+function closeSeaceModal() {
+  if (!seaceFilterModal) {
+    return;
+  }
+
+  seaceFilterModal.classList.remove("active");
+  seaceFilterModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+}
+
+function buildUpdatedProfile() {
+  const currentYear = new Date().getFullYear();
+  return {
+    companyName: currentProfile?.companyName || "Default",
+    preferredCategories: currentProfile?.preferredCategories || [],
+    preferredLocations: currentProfile?.preferredLocations || [],
+    preferredModalities: currentProfile?.preferredModalities || [],
+    minAmount: currentProfile?.minAmount || 10000,
+    maxAmount: currentProfile?.maxAmount || 500000,
+    idealAmount: currentProfile?.idealAmount || 250000,
+    favoriteEntities: currentProfile?.favoriteEntities || [],
+    excludedEntities: currentProfile?.excludedEntities || [],
+    preferredKeywords: currentProfile?.preferredKeywords || profileKeywords.preferred || [],
+    excludedKeywords: currentProfile?.excludedKeywords || profileKeywords.excluded || [],
+    seaceObjectDescription: seaceObjectDescriptionModal?.value.trim() || "",
+    seaceContractObject: seaceContractObjectModal?.value || "",
+    seaceCallYear: normalizeSeaceYear(seaceCallYearModal?.value || currentYear),
+    minDaysToClose: currentProfile?.minDaysToClose || 3,
+    maxDaysToClose: currentProfile?.maxDaysToClose || 30,
+    idealDaysToClose: currentProfile?.idealDaysToClose || 15
+  };
+}
+
+async function saveSeaceFilter() {
+  try {
+    await loadProfile();
+    const profileData = buildUpdatedProfile();
+    const endpoint = currentProfile?.profileId
+      ? `${API_BASE}/api/profile/${currentProfile.profileId}`
+      : `${API_BASE}/api/profile`;
+    const method = currentProfile?.profileId ? "PUT" : "POST";
+
+    const response = await fetch(endpoint, {
+      method,
+      headers: getJsonAuthHeaders(),
+      body: JSON.stringify(profileData)
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Sesion expirada. Inicia sesion nuevamente.");
+      }
+
+      throw new Error(`No se pudo guardar el filtro SEACE (${response.status}).`);
+    }
+
+    currentProfile = await response.json();
+    profileKeywords.seaceObjectDescription = currentProfile.seaceObjectDescription || "";
+    profileKeywords.seaceContractObject = currentProfile.seaceContractObject || "";
+    profileKeywords.seaceCallYear = normalizeSeaceYear(currentProfile.seaceCallYear);
+    setMessage("Filtro SEACE guardado.");
+    return true;
+  } catch (error) {
+    console.error("Error guardando filtro SEACE:", error);
+    setMessage("Error al guardar filtro SEACE: " + error.message);
+    return false;
+  }
+}
+
+async function syncSeace() {
+  try {
+    if (syncSeaceButton) {
+      syncSeaceButton.disabled = true;
+      syncSeaceButton.textContent = "Sincronizando...";
+    }
+
+    setMessage("Iniciando sincronizacion con SEACE...");
+    const response = await fetch(`${API_BASE}/api/seace/refresh`, {
+      method: "POST",
+      headers: getJsonAuthHeaders()
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Sesion expirada. Inicia sesion nuevamente.");
+      }
+
+      throw new Error(`Error al sincronizar con SEACE: ${response.status}`);
+    }
+
+    const data = await response.json();
+    setMessage(data.message || "Sincronizacion completada exitosamente");
+    await loadOpportunities();
+  } catch (error) {
+    console.error("Error en sincronizacion:", error);
+    setMessage("Error al sincronizar con SEACE: " + error.message);
+  } finally {
+    if (syncSeaceButton) {
+      syncSeaceButton.disabled = false;
+      syncSeaceButton.textContent = "Sincronizar SEACE";
+    }
+  }
 }
 
 async function loadOpportunities() {

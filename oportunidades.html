@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260517-2">
+  <link rel="stylesheet" href="style.css?v=20260518-1">
 </head>
 <body>
   <div class="app-shell">
@@ -161,6 +161,49 @@
     </main>
   </div>
 
-  <script src="script.js?v=20260517-2"></script>
+  <div class="modal-backdrop" id="seaceFilterModal" aria-hidden="true">
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="seaceFilterTitle">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Filtro SEACE</p>
+          <h3 id="seaceFilterTitle">Configurar sincronizacion</h3>
+        </div>
+        <button class="icon-button" type="button" id="closeSeaceFilterModal" aria-label="Cerrar">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="seaceObjectDescriptionModal">Descripcion del Objeto</label>
+          <input type="text" id="seaceObjectDescriptionModal" class="form-control" maxlength="500" placeholder="Ej: videovigilancia, mantenimiento, software...">
+          <small class="help-text">Este texto se escribira en el campo descripcionObjeto de SEACE antes de buscar.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="seaceContractObjectModal">Objeto de Contratacion</label>
+          <select id="seaceContractObjectModal" class="form-control">
+            <option value="">[Seleccione]</option>
+            <option value="Bien">Bien</option>
+            <option value="Consultoría de Obra">Consultoria de Obra</option>
+            <option value="Obra">Obra</option>
+            <option value="Servicio">Servicio</option>
+          </select>
+          <small class="help-text">Se seleccionara en el combo Objeto de Contratacion de SEACE.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="seaceCallYearModal">Anio de Convocatoria</label>
+          <select id="seaceCallYearModal" class="form-control"></select>
+          <small class="help-text">Se seleccionara en el combo anioConvocatoria de SEACE.</small>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="secondary-button" type="button" id="saveSeaceFilterButton">Guardar filtro</button>
+        <button class="primary-button" type="button" id="runSeaceFilterButton">Guardar y sincronizar</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js?v=20260518-2"></script>
 </body>
 </html>
