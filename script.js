@@ -496,8 +496,8 @@ document.addEventListener('change', (e) => {
   }
 });
 
-// Tab functionality for page-tabs
-const pageTabs = document.querySelectorAll('.page-tabs a');
+// Tab functionality for opportunity filters
+const pageTabs = document.querySelectorAll('.page-tabs a[data-tab]');
 
 pageTabs.forEach(tab => {
   tab.addEventListener('click', (e) => {
@@ -1277,20 +1277,35 @@ if (runAiAnalysisButton) {
   });
 }
 
-document.querySelectorAll('.page-tabs a[href^="#"]').forEach((tabLink) => {
+const detailTabLinks = document.querySelectorAll('.page-tabs a[href^="#"]:not([data-tab])');
+const detailTabPanels = document.querySelectorAll("[data-detail-tab]");
+
+function activateDetailTab(tabName) {
+  if (!detailTabPanels.length) {
+    return;
+  }
+
+  detailTabPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.detailTab !== tabName;
+  });
+}
+
+detailTabLinks.forEach((tabLink) => {
   tabLink.addEventListener("click", (event) => {
     const targetSelector = tabLink.getAttribute("href");
-    const target = targetSelector ? document.querySelector(targetSelector) : null;
-    if (!target) {
+    const tabName = targetSelector ? targetSelector.replace("#", "") : "";
+    if (!tabName || !document.querySelector(`[data-detail-tab="${tabName}"]`)) {
       return;
     }
 
     event.preventDefault();
-    document.querySelectorAll(".page-tabs a").forEach((item) => item.classList.remove("active"));
+    detailTabLinks.forEach((item) => item.classList.remove("active"));
     tabLink.classList.add("active");
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    activateDetailTab(tabName);
   });
 });
+
+activateDetailTab("resumen");
 
 async function loadAiAnalysisStatus(opportunityId) {
   if (!aiAnalysisList || !aiStatusText) {

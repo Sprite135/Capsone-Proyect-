@@ -57,16 +57,14 @@
         </div>
       </header>
 
-      <div class="page-tabs">
+      <nav class="page-tabs" aria-label="Secciones del detalle">
         <a class="active" href="#resumen">Resumen</a>
         <a href="#ia">Analisis IA</a>
-        <a href="#documentos">Documentos</a>
-        <a href="#historial">Historial</a>
-      </div>
+      </nav>
 
       <section class="detail-layout">
         <div class="detail-stack">
-          <article class="panel-card detail-block" id="resumen">
+          <article class="panel-card detail-block detail-tab-panel" id="resumen" data-detail-tab="resumen">
             <div class="detail-header">
               <div>
                 <p class="eyebrow">Resumen general</p>
@@ -92,7 +90,7 @@
             </div>
           </article>
 
-          <article class="panel-card detail-block" id="ficha-seace">
+          <article class="panel-card detail-block detail-tab-panel" id="ficha-seace" data-detail-tab="resumen">
             <div class="card-header">
               <div>
                 <p class="eyebrow">Convocatoria SEACE</p>
@@ -104,7 +102,7 @@
             </div>
           </article>
 
-          <article class="panel-card detail-block schedule-block">
+          <article class="panel-card detail-block schedule-block detail-tab-panel" data-detail-tab="resumen">
             <div class="card-header">
               <div>
                 <p class="eyebrow">Cronograma SEACE</p>
@@ -116,7 +114,7 @@
             </div>
           </article>
 
-          <article class="panel-card detail-block" id="ia">
+          <article class="panel-card detail-block detail-tab-panel" id="ia" data-detail-tab="ia" hidden>
             <div class="card-header">
               <div>
                 <p class="eyebrow">Analisis IA</p>

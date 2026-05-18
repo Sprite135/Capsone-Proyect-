@@ -749,6 +749,10 @@ input.search-box:focus {
   background: linear-gradient(135deg, var(--blue), #6ea8ff);
 }
 
+.detail-tab-panel[hidden] {
+  display: none !important;
+}
+
 .hero-highlight {
   padding: 24px;
   border-radius: 24px;
@@ -932,6 +936,7 @@ select option {
 
 .detail-layout {
   grid-template-columns: 1.25fr 0.75fr;
+  align-items: start;
 }
 
 .alert-layout {
@@ -1779,6 +1784,13 @@ td,
 .ai-panel {
   display: grid;
   gap: 14px;
+  align-items: start;
+}
+
+.ai-panel .primary-button {
+  justify-self: start;
+  width: fit-content;
+  min-width: 180px;
 }
 
 .ai-panel > p {
