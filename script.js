@@ -1823,6 +1823,7 @@ function renderSeaceDocuments(documentsJson) {
             <th>Documento</th>
             <th>Archivo</th>
             <th>Fecha publicacion</th>
+            <th>Accion</th>
           </tr>
         </thead>
         <tbody>
@@ -1833,12 +1834,30 @@ function renderSeaceDocuments(documentsJson) {
               <td>${escapeHtml(item.documento || "-")}</td>
               <td>${escapeHtml(item.archivo || "-")}</td>
               <td>${escapeHtml(item.fechaPublicacion || "-")}</td>
+              <td>
+                <button class="document-open-btn" type="button" data-document-index="${index}">
+                  Descargar
+                </button>
+              </td>
             </tr>
           `).join("")}
         </tbody>
       </table>
     </div>
   `;
+}
+
+if (detailDocumentsList) {
+  detailDocumentsList.addEventListener("click", (event) => {
+    const button = event.target.closest(".document-open-btn");
+    if (!button || !currentDetailOpportunityId) {
+      return;
+    }
+
+    const documentIndex = button.dataset.documentIndex || "0";
+    const url = `${API_BASE}/api/opportunities/${encodeURIComponent(currentDetailOpportunityId)}/documents/${encodeURIComponent(documentIndex)}/download`;
+    window.open(url, "_blank", "noopener");
+  });
 }
 
 function renderSeaceFields(detailJson) {

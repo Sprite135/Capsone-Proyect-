@@ -2240,28 +2240,60 @@ td,
 
 .document-table th:first-child,
 .document-table td:first-child {
-  width: 72px;
+  width: 52px;
   text-align: center;
 }
 
 .document-table th:nth-child(2),
 .document-table td:nth-child(2) {
-  width: 18%;
+  width: 15%;
 }
 
 .document-table th:nth-child(3),
 .document-table td:nth-child(3) {
-  width: 22%;
+  width: 28%;
+  overflow-wrap: anywhere;
 }
 
 .document-table th:nth-child(4),
 .document-table td:nth-child(4) {
-  width: 34%;
+  width: 13%;
+  white-space: nowrap;
 }
 
 .document-table th:nth-child(5),
 .document-table td:nth-child(5) {
   width: 18%;
+  white-space: nowrap;
+}
+
+.document-table th:nth-child(6),
+.document-table td:nth-child(6) {
+  width: 120px;
+  min-width: 120px;
+  text-align: center;
+}
+
+.document-open-btn {
+  border: 1px solid rgba(82, 143, 255, 0.45);
+  border-radius: 999px;
+  background: rgba(82, 143, 255, 0.16);
+  color: #dce8ff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.1;
+  min-height: 34px;
+  width: 98px;
+  padding: 0.45rem 0.65rem;
+  white-space: nowrap;
+}
+
+.document-open-btn:hover {
+  background: rgba(82, 143, 255, 0.28);
 }
 
 .schedule-table th {

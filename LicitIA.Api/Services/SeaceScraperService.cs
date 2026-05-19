@@ -2,7 +2,9 @@ using Microsoft.Playwright;
 using HtmlAgilityPack;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Text.Json;
+using LicitIA.Api.Models;
 
 [assembly: InternalsVisibleTo("LicitIA.Tests")]
 
@@ -11,6 +13,7 @@ namespace LicitIA.Api.Services;
 public class SeaceScraperService
 {
     private readonly HttpClient _httpClient;
+    private const string SearchUrl = "https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml#";
 
     public SeaceScraperService(HttpClient httpClient)
     {
@@ -52,6 +55,299 @@ public class SeaceScraperService
             Console.WriteLine("[SeaceScraper] Usando datos de ejemplo como fallback");
             return GetExampleOpportunities();
         }
+    }
+
+    public async Task<SeaceDocumentDownloadResult?> DownloadDocumentAsync(
+        Opportunity opportunity,
+        int documentIndex,
+        CancellationToken cancellationToken = default)
+    {
+        var downloadUrl = await CreateDocumentDownloadUrlAsync(opportunity, documentIndex, cancellationToken);
+        return string.IsNullOrWhiteSpace(downloadUrl)
+            ? null
+            : new SeaceDocumentDownloadResult(
+                System.Text.Encoding.UTF8.GetBytes(downloadUrl),
+                "text/plain; charset=utf-8",
+                "seace-document-url.txt");
+    }
+
+    public async Task<string> CreateDocumentDownloadUrlAsync(
+        Opportunity opportunity,
+        int documentIndex,
+        CancellationToken cancellationToken = default)
+    {
+        if (documentIndex < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(documentIndex));
+        }
+
+        using var playwright = await Playwright.CreateAsync();
+        var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        {
+            Headless = false,
+            SlowMo = 100
+        });
+
+        try
+        {
+            var context = await browser.NewContextAsync(new BrowserNewContextOptions
+            {
+                AcceptDownloads = false
+            });
+            var page = await context.NewPageAsync();
+
+            await OpenSearchPageAsync(page);
+
+            var callYear = opportunity.PublishedDate?.Year ?? DateTime.UtcNow.Year;
+            await ApplyCallYearFilterAsync(page, callYear);
+            await EnsureAdvancedSearchExpandedAsync(page, opportunity.ProcessCode);
+            await ApplyEntityAcronymFilterAsync(page, opportunity.ProcessCode);
+
+            if (!string.IsNullOrWhiteSpace(opportunity.ContractObject))
+            {
+                await ApplyContractObjectFilterAsync(page, opportunity.ContractObject);
+            }
+
+            await ClickSearchButtonAsync(page);
+            await WaitForSearchResultsAsync(page, opportunity.ProcessCode);
+            await page.WaitForSelectorAsync("#tbBuscador\\:idFormBuscarProceso\\:dtProcesos_data tr", new PageWaitForSelectorOptions
+            {
+                Timeout = 20000
+            });
+
+            var opened = await OpenDetailByProcessCodeAsync(page, opportunity.ProcessCode);
+            if (!opened)
+            {
+                Console.WriteLine($"[SeaceScraper] No se encontro la oportunidad para descargar documento: {opportunity.ProcessCode}");
+                return string.Empty;
+            }
+
+            await page.WaitForSelectorAsync("#tbFicha\\:dtDocumentos_data tr", new PageWaitForSelectorOptions
+            {
+                Timeout = 20000
+            });
+
+            var buttonId = $"tbFicha:dtDocumentos:{documentIndex}:j_idt392";
+            var response = await page.RunAndWaitForResponseAsync(
+                async () =>
+                {
+                    var clicked = await page.EvaluateAsync<bool>(
+                        @"(buttonId) => {
+                            const button = document.getElementById(buttonId);
+                            if (!button) return false;
+                            const target = button.closest('a, button, .ui-button') || button;
+                            target.scrollIntoView({ block: 'center', inline: 'center' });
+                            target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                            target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                            target.click();
+                            return true;
+                        }",
+                        buttonId);
+
+                    if (!clicked)
+                    {
+                        throw new InvalidOperationException($"No se encontro el boton exacto del documento: {buttonId}");
+                    }
+                },
+                item => item.Url.Contains("downloadDoc", StringComparison.OrdinalIgnoreCase),
+                new PageRunAndWaitForResponseOptions { Timeout = 30000 });
+
+            var body = await response.TextAsync();
+            var downloadUrl = ExtractDownloadUrl(body);
+            if (string.IsNullOrWhiteSpace(downloadUrl))
+            {
+                return string.Empty;
+            }
+
+            Console.WriteLine($"[SeaceScraper] URL temporal capturada para documento SEACE: {buttonId}");
+            return downloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? downloadUrl
+                : $"https://alfprod.seace.gob.pe/alfresco{downloadUrl}";
+        }
+        finally
+        {
+            await browser.CloseAsync();
+        }
+    }
+
+    private static string ExtractDownloadUrl(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var match = Regex.Match(value, @"""downloadUrl""\s*:\s*""(?<url>[^""]+)""", RegexOptions.IgnoreCase);
+        return match.Success ? Regex.Unescape(match.Groups["url"].Value) : string.Empty;
+    }
+
+    private static string GetFileNameFromDownloadUrl(string downloadUrl, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(downloadUrl))
+        {
+            return fallback;
+        }
+
+        var withoutQuery = downloadUrl.Split('?', 2)[0];
+        var name = withoutQuery.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        return string.IsNullOrWhiteSpace(name) ? fallback : Uri.UnescapeDataString(name);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var fileName = string.IsNullOrWhiteSpace(value) ? "documento-seace.pdf" : value.Trim();
+        foreach (var invalid in Path.GetInvalidFileNameChars())
+        {
+            fileName = fileName.Replace(invalid, '_');
+        }
+
+        return fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? fileName : $"{fileName}.pdf";
+    }
+
+    private async Task OpenSearchPageAsync(IPage page)
+    {
+        Console.WriteLine("[SeaceScraper] Navegando a SEACE - pagina principal...");
+        await page.GotoAsync(SearchUrl, new PageGotoOptions
+        {
+            WaitUntil = WaitUntilState.DOMContentLoaded,
+            Timeout = 60000
+        });
+
+        Console.WriteLine("[SeaceScraper] Esperando boton de buscador...");
+        try
+        {
+            await page.WaitForSelectorAsync("button:has-text('Buscador de Procedimientos de Selección'), button:has-text('Buscador de Procedimientos de Seleccion'), a:has-text('Buscador de Procedimientos de Selección'), a:has-text('Buscador de Procedimientos de Seleccion')", new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var button = await page.QuerySelectorAsync("button:has-text('Buscador de Procedimientos de Selección'), button:has-text('Buscador de Procedimientos de Seleccion'), a:has-text('Buscador de Procedimientos de Selección'), a:has-text('Buscador de Procedimientos de Seleccion')");
+            if (button != null)
+            {
+                await button.ClickAsync();
+            }
+        }
+        catch
+        {
+            await page.EvaluateAsync(@"() => {
+                const normalize = value => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                const elements = Array.from(document.querySelectorAll('button, a, div, span'));
+                const target = elements.find(el => normalize(el.textContent).includes('buscador de procedimientos de seleccion'));
+                if (target) target.click();
+            }");
+        }
+    }
+
+    private async Task ClickSearchButtonAsync(IPage page)
+    {
+        Console.WriteLine("[SeaceScraper] Esperando boton Buscar...");
+        try
+        {
+            await page.WaitForSelectorAsync("#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken", new PageWaitForSelectorOptions
+            {
+                Timeout = 10000
+            });
+
+            var searchButton = await page.QuerySelectorAsync("#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken");
+            if (searchButton != null)
+            {
+                await searchButton.ClickAsync();
+            }
+        }
+        catch
+        {
+            await page.EvaluateAsync(@"() => {
+                const buttons = Array.from(document.querySelectorAll('button, input[type=""submit""]'));
+                const searchBtn = buttons.find(btn => (btn.textContent || '').includes('Buscar') || (btn.value || '').includes('Buscar'));
+                if (searchBtn) searchBtn.click();
+            }");
+        }
+    }
+
+    private async Task WaitForSearchResultsAsync(IPage page, string processCode)
+    {
+        try
+        {
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions
+            {
+                Timeout = 15000
+            });
+        }
+        catch
+        {
+            Console.WriteLine("[SeaceScraper] Timeout esperando red inactiva despues de Buscar.");
+        }
+
+        try
+        {
+            await page.WaitForFunctionAsync(
+                @"(processCode) => {
+                    const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
+                    const rowsRoot = document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_data');
+                    const rows = rowsRoot ? Array.from(rowsRoot.querySelectorAll('tr')) : [];
+                    return rows.some(row => normalize(row.textContent).includes(normalize(processCode)));
+                }",
+                processCode,
+                new PageWaitForFunctionOptions { Timeout = 15000 });
+        }
+        catch
+        {
+            var visibleText = await page.EvaluateAsync<string>(
+                @"() => {
+                    const rowsRoot = document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_data');
+                    return rowsRoot ? (rowsRoot.innerText || rowsRoot.textContent || '').slice(0, 800) : '';
+                }");
+            Console.WriteLine($"[SeaceScraper] No aparecio la nomenclatura en resultados. Texto visible: {visibleText}");
+        }
+    }
+
+    private async Task<bool> OpenDetailByProcessCodeAsync(IPage page, string processCode)
+    {
+        var clicked = await page.EvaluateAsync<bool>(
+            @"(processCode) => {
+                const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
+                const rowsRoot = document.getElementById('tbBuscador:idFormBuscarProceso:dtProcesos_data');
+                const rows = rowsRoot ? Array.from(rowsRoot.querySelectorAll('tr')) : [];
+                const row = rows.find(current => normalize(current.textContent).includes(normalize(processCode)));
+                if (!row) return false;
+
+                const candidates = Array.from(row.querySelectorAll('[id$="":j_idt377""], a, button, input[type=""submit""], span.ui-button'));
+                const button = candidates.find(item => item.id && item.id.endsWith(':j_idt377')) || candidates[candidates.length - 1];
+                const target = button?.closest?.('a, button, .ui-button') || button;
+                if (!target) return false;
+                target.click();
+                return true;
+            }",
+            processCode);
+
+        if (!clicked)
+        {
+            return false;
+        }
+
+        await page.WaitForSelectorAsync("#tbFicha\\:pnlContenedorGral", new PageWaitForSelectorOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        return true;
+    }
+
+    private async Task<string> GetDocumentFileNameAsync(IPage page, int documentIndex)
+    {
+        return await page.EvaluateAsync<string>(
+            @"(index) => {
+                const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
+                const row = document.querySelectorAll('#tbFicha\\:dtDocumentos_data tr')[index];
+                if (!row) return 'documento-seace.pdf';
+                const cells = Array.from(row.querySelectorAll('td')).map(cell => normalize(cell.textContent));
+                const fileCell = cells[3] || cells.find(item => item.toLowerCase().includes('.pdf')) || '';
+                const match = fileCell.match(/[A-Za-z0-9_.+\- ]+\.pdf/i);
+                return match ? match[0].trim() : 'documento-seace.pdf';
+            }",
+            documentIndex);
     }
 
     private async Task<List<ScrapedOpportunity>> ScrapeWithPlaywright(int maxResults, CancellationToken cancellationToken, string? objectDescription, int? callYear, string? contractObject, string? entityAcronym, string? department, string? province, string? district)
@@ -1832,3 +2128,5 @@ public class SeaceScraperService
         return new List<ScrapedOpportunity>();
     }
 }
+
+public sealed record SeaceDocumentDownloadResult(byte[] Content, string ContentType, string FileName);

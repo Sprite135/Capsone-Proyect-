@@ -260,6 +260,51 @@ app.MapGet("/api/opportunities/{id:int}", async (
     }
 });
 
+app.MapGet("/api/opportunities/{id:int}/documents/{documentIndex:int}/download", async (
+    int id,
+    int documentIndex,
+    OpportunityRepository repository,
+    SeaceScraperService seaceScraperService,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var opportunity = await repository.GetByIdAsync(id, cancellationToken);
+        if (opportunity is null)
+        {
+            return Results.NotFound(new { message = "No se encontro la oportunidad solicitada." });
+        }
+
+        var downloadUrl = await seaceScraperService.CreateDocumentDownloadUrlAsync(opportunity, documentIndex, cancellationToken);
+        if (string.IsNullOrWhiteSpace(downloadUrl))
+        {
+            return Results.NotFound(new { message = "No se pudo abrir el documento en SEACE." });
+        }
+
+        return Results.Redirect(downloadUrl);
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        return Results.BadRequest(new { message = "Indice de documento invalido." });
+    }
+    catch (SqlException)
+    {
+        return Results.Problem(
+            title: "No se pudo consultar SQL Server.",
+            detail: "Revisa la conexion y ejecuta el script de base de datos.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SeaceDocument] Error descargando documento: {ex.Message}");
+        return Results.Problem(
+            title: "No se pudo obtener el documento.",
+            detail: "SEACE no devolvio el archivo solicitado.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.MapGet("/api/opportunities/{id:int}/ai-analysis", async (
     int id,
     OpportunityAiAnalysisRepository analysisRepository,
