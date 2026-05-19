@@ -55,4 +55,6 @@ public sealed class Opportunity
     public string SeaceDetailJson { get; init; } = string.Empty;
 
     public string SeaceScheduleJson { get; init; } = string.Empty;
+
+    public string SeaceDocumentsJson { get; init; } = string.Empty;
 }

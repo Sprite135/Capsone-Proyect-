@@ -55,6 +55,7 @@ public sealed class OpportunityResponse
     public string BasesReproductionCost { get; init; } = string.Empty;
     public string SeaceDetailJson { get; init; } = string.Empty;
     public string SeaceScheduleJson { get; init; } = string.Empty;
+    public string SeaceDocumentsJson { get; init; } = string.Empty;
 
     public static OpportunityResponse FromModel(Opportunity opportunity) =>
         new()
@@ -85,6 +86,7 @@ public sealed class OpportunityResponse
             BasesReproductionCost = opportunity.BasesReproductionCost,
             SeaceDetailJson = opportunity.SeaceDetailJson,
             SeaceScheduleJson = opportunity.SeaceScheduleJson,
+            SeaceDocumentsJson = opportunity.SeaceDocumentsJson,
             RecommendationLabel = opportunity.MatchScore >= 80 ? "Alta prioridad" :
                 opportunity.MatchScore >= 60 ? "Recomendada" :
                 opportunity.MatchScore >= 40 ? "Revisar" : "Baja afinidad",
@@ -123,6 +125,7 @@ public sealed class OpportunityResponse
             BasesReproductionCost = opportunity.BasesReproductionCost,
             SeaceDetailJson = opportunity.SeaceDetailJson,
             SeaceScheduleJson = opportunity.SeaceScheduleJson,
+            SeaceDocumentsJson = opportunity.SeaceDocumentsJson,
             RecommendationLabel = analysis.Label,
             RecommendationReason = analysis.Reason,
             PriorityLevel = analysis.PriorityLevel,

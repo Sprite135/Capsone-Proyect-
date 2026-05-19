@@ -26,6 +26,7 @@ public class ScrapedOpportunity
     public string BasesReproductionCost { get; set; } = string.Empty;
     public string SeaceDetailJson { get; set; } = string.Empty;
     public string SeaceScheduleJson { get; set; } = string.Empty;
+    public string SeaceDocumentsJson { get; set; } = string.Empty;
     public string SeaceDetailButtonId { get; set; } = string.Empty;
     public int SeaceRowIndex { get; set; }
 }

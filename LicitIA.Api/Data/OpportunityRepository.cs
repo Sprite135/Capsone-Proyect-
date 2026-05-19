@@ -45,7 +45,8 @@ public sealed class OpportunityRepository
                 ParticipationCost,
                 BasesReproductionCost,
                 SeaceDetailJson,
-                SeaceScheduleJson
+                SeaceScheduleJson,
+                SeaceDocumentsJson
             FROM dbo.Opportunities
             ORDER BY SeaceIndex ASC;
             """;
@@ -95,7 +96,8 @@ public sealed class OpportunityRepository
                 ParticipationCost,
                 BasesReproductionCost,
                 SeaceDetailJson,
-                SeaceScheduleJson
+                SeaceScheduleJson,
+                SeaceDocumentsJson
             FROM dbo.Opportunities
             WHERE OpportunityId = @OpportunityId;
             """;
@@ -145,7 +147,8 @@ public sealed class OpportunityRepository
                 ParticipationCost,
                 BasesReproductionCost,
                 SeaceDetailJson,
-                SeaceScheduleJson
+                SeaceScheduleJson,
+                SeaceDocumentsJson
             FROM dbo.Opportunities
             WHERE ProcessCode = @ProcessCode;
             """;
@@ -217,7 +220,8 @@ public sealed class OpportunityRepository
                 ParticipationCost,
                 BasesReproductionCost,
                 SeaceDetailJson,
-                SeaceScheduleJson
+                SeaceScheduleJson,
+                SeaceDocumentsJson
             )
             VALUES
             (
@@ -246,7 +250,8 @@ public sealed class OpportunityRepository
                 @ParticipationCost,
                 @BasesReproductionCost,
                 @SeaceDetailJson,
-                @SeaceScheduleJson
+                @SeaceScheduleJson,
+                @SeaceDocumentsJson
             );
             """;
 
@@ -277,6 +282,7 @@ public sealed class OpportunityRepository
         command.Parameters.AddWithValue("@BasesReproductionCost", opportunity.BasesReproductionCost);
         command.Parameters.AddWithValue("@SeaceDetailJson", opportunity.SeaceDetailJson);
         command.Parameters.AddWithValue("@SeaceScheduleJson", opportunity.SeaceScheduleJson);
+        command.Parameters.AddWithValue("@SeaceDocumentsJson", opportunity.SeaceDocumentsJson);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -350,7 +356,8 @@ public sealed class OpportunityRepository
             ParticipationCost = GetString(reader, "ParticipationCost"),
             BasesReproductionCost = GetString(reader, "BasesReproductionCost"),
             SeaceDetailJson = GetString(reader, "SeaceDetailJson"),
-            SeaceScheduleJson = GetString(reader, "SeaceScheduleJson")
+            SeaceScheduleJson = GetString(reader, "SeaceScheduleJson"),
+            SeaceDocumentsJson = GetString(reader, "SeaceDocumentsJson")
         };
 
     private static string GetString(SqlDataReader reader, string columnName)

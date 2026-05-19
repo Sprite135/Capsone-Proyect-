@@ -2238,6 +2238,32 @@ td,
   width: 24%;
 }
 
+.document-table th:first-child,
+.document-table td:first-child {
+  width: 72px;
+  text-align: center;
+}
+
+.document-table th:nth-child(2),
+.document-table td:nth-child(2) {
+  width: 18%;
+}
+
+.document-table th:nth-child(3),
+.document-table td:nth-child(3) {
+  width: 22%;
+}
+
+.document-table th:nth-child(4),
+.document-table td:nth-child(4) {
+  width: 34%;
+}
+
+.document-table th:nth-child(5),
+.document-table td:nth-child(5) {
+  width: 18%;
+}
+
 .schedule-table th {
   color: #9bc0ff;
   background: rgba(7, 18, 32, 0.72);

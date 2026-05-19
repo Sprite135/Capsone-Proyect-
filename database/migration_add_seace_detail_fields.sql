@@ -36,4 +36,7 @@ IF COL_LENGTH('dbo.Opportunities', 'SeaceDetailJson') IS NULL
 IF COL_LENGTH('dbo.Opportunities', 'SeaceScheduleJson') IS NULL
     ALTER TABLE dbo.Opportunities ADD SeaceScheduleJson NVARCHAR(MAX) NOT NULL CONSTRAINT DF_Opportunities_SeaceScheduleJson DEFAULT '';
 
+IF COL_LENGTH('dbo.Opportunities', 'SeaceDocumentsJson') IS NULL
+    ALTER TABLE dbo.Opportunities ADD SeaceDocumentsJson NVARCHAR(MAX) NOT NULL CONSTRAINT DF_Opportunities_SeaceDocumentsJson DEFAULT '';
+
 PRINT 'Migracion de detalles SEACE completada.';

@@ -844,8 +844,32 @@ public class SeaceScraperService
                 return JSON.stringify(rows);
             }");
 
-        ApplyDetailFields(opportunity, details, scheduleJson);
-        Console.WriteLine($"[SeaceScraper] Detalle extraido de fila {rowIndex}: {details.Count} campos. Texto ficha: {fichaText.Length} caracteres.");
+        var documentsJson = await page.EvaluateAsync<string>(
+            @"() => {
+                const root = document.getElementById('tbFicha:dtDocumentos');
+                if (!root) return '';
+
+                const normalize = value => (value || '').replace(/\s+/g, ' ').trim();
+                const dataRoot = document.getElementById('tbFicha:dtDocumentos_data') || root;
+                const rows = Array.from(dataRoot.querySelectorAll('tr')).map(row => {
+                    const cells = Array.from(row.querySelectorAll('td')).map(cell => normalize(cell.textContent));
+                    if (cells.length < 4) return null;
+
+                    return {
+                        numero: cells[0] || '',
+                        etapa: cells[1] || '',
+                        documento: cells[2] || '',
+                        archivo: cells[3] || '',
+                        fechaPublicacion: cells[4] || '',
+                        acciones: cells[5] || ''
+                    };
+                }).filter(item => item && (item.documento || item.archivo || item.fechaPublicacion));
+
+                return JSON.stringify(rows);
+            }");
+
+        ApplyDetailFields(opportunity, details, scheduleJson, documentsJson);
+        Console.WriteLine($"[SeaceScraper] Detalle extraido de fila {rowIndex}: {details.Count} campos. Texto ficha: {fichaText.Length} caracteres. Documentos: {documentsJson.Length} caracteres.");
     }
 
     private static Dictionary<string, string> ExtractDetailsFromFichaText(string fichaText)
@@ -944,7 +968,7 @@ public class SeaceScraperService
         return details;
     }
 
-    private void ApplyDetailFields(ScrapedOpportunity opportunity, Dictionary<string, string> details, string scheduleJson)
+    private void ApplyDetailFields(ScrapedOpportunity opportunity, Dictionary<string, string> details, string scheduleJson, string documentsJson)
     {
         opportunity.ProcessCode = ReadDetail(details, "Nomenclatura", opportunity.ProcessCode);
         opportunity.ConvocationNumber = ReadDetail(details, "N Convocatoria", opportunity.ConvocationNumber);
@@ -973,6 +997,7 @@ public class SeaceScraperService
 
         opportunity.SeaceDetailJson = JsonSerializer.Serialize(details);
         opportunity.SeaceScheduleJson = scheduleJson ?? string.Empty;
+        opportunity.SeaceDocumentsJson = documentsJson ?? string.Empty;
     }
 
     private static string ReadDetail(Dictionary<string, string> details, string label, string fallback)

@@ -31,6 +31,7 @@ const detailEntityPhone = document.getElementById("detailEntityPhone");
 const detailBasesCost = document.getElementById("detailBasesCost");
 const detailScheduleList = document.getElementById("detailScheduleList");
 const detailSeaceFields = document.getElementById("detailSeaceFields");
+const detailDocumentsList = document.getElementById("detailDocumentsList");
 const syncSeaceButton = document.getElementById('syncSeaceButton');
 const seaceFilterModal = document.getElementById("seaceFilterModal");
 const closeSeaceFilterModal = document.getElementById("closeSeaceFilterModal");
@@ -1735,6 +1736,7 @@ function renderOpportunityDetail(item) {
   setText(detailEntityPhone, item.entityPhone || "No disponible");
   setText(detailBasesCost, item.basesReproductionCost || item.participationCost || "No disponible");
   renderSeaceSchedule(item.seaceScheduleJson);
+  renderSeaceDocuments(item.seaceDocumentsJson);
   renderSeaceFields(item.seaceDetailJson);
 
   document.title = `LicitIA | ${item.processCode}`;
@@ -1792,6 +1794,51 @@ function isHighlightedScheduleStage(stage) {
   return value.includes("registro de participantes") ||
     value.includes("formulacion de consultas") ||
     value.includes("observaciones");
+}
+
+function renderSeaceDocuments(documentsJson) {
+  if (!detailDocumentsList) {
+    return;
+  }
+
+  let documents = [];
+  try {
+    documents = documentsJson ? JSON.parse(documentsJson) : [];
+  } catch {
+    documents = [];
+  }
+
+  if (!Array.isArray(documents) || documents.length === 0) {
+    detailDocumentsList.innerHTML = '<div class="schedule-empty">Sin documentos disponibles</div>';
+    return;
+  }
+
+  detailDocumentsList.innerHTML = `
+    <div class="schedule-table-wrap">
+      <table class="schedule-table document-table">
+        <thead>
+          <tr>
+            <th>Nro.</th>
+            <th>Etapa</th>
+            <th>Documento</th>
+            <th>Archivo</th>
+            <th>Fecha publicacion</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${documents.map((item, index) => `
+            <tr>
+              <td>${escapeHtml(item.numero || String(index + 1))}</td>
+              <td>${escapeHtml(item.etapa || "-")}</td>
+              <td>${escapeHtml(item.documento || "-")}</td>
+              <td>${escapeHtml(item.archivo || "-")}</td>
+              <td>${escapeHtml(item.fechaPublicacion || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderSeaceFields(detailJson) {

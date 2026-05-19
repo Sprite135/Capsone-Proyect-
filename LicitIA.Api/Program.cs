@@ -1037,7 +1037,8 @@ app.MapPost("/api/seace/refresh", async (
                     ParticipationCost = scraped.ParticipationCost,
                     BasesReproductionCost = scraped.BasesReproductionCost,
                     SeaceDetailJson = scraped.SeaceDetailJson,
-                    SeaceScheduleJson = scraped.SeaceScheduleJson
+                    SeaceScheduleJson = scraped.SeaceScheduleJson,
+                    SeaceDocumentsJson = scraped.SeaceDocumentsJson
                 };
                 await repository.InsertOpportunityAsync(opportunity, cancellationToken);
                 savedCount++;
