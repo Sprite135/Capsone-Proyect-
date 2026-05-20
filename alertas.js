@@ -134,6 +134,7 @@ function renderAlertRules() {
         <div>
           <strong>${escapeHtml(rule.name)}</strong>
           <p>${formatTrigger(rule.triggerType)} | Afinidad minima: ${conditions.affinityScore ?? 0}% | ${statusText}</p>
+          <p>${conditions.syncBeforeCheck ? 'Sincroniza SEACE antes de revisar' : 'Revisa oportunidades guardadas'}</p>
           <p>Canales: ${channels.filter(channel => channel !== 'slack').map(formatChannel).join(', ') || 'Sin canales'}</p>
           <p>Destinatarios: ${recipients.join(', ') || 'Sin destinatarios'}</p>
         </div>
@@ -213,6 +214,7 @@ function resetForm() {
   alertForm.triggerType.value = 'alta_afinidad';
   alertForm.affinityScore.value = '85';
   alertForm.status.value = 'recomendado';
+  alertForm.syncBeforeCheck.checked = false;
   alertForm.messageTemplate.value = '';
   alertForm.isActive.checked = true;
   alertForm.querySelector('input[name="channels"][value="panel"]').checked = true;
@@ -237,6 +239,7 @@ function editRule(ruleId) {
   alertForm.triggerType.value = rule.triggerType;
   alertForm.affinityScore.value = conditions.affinityScore ?? 85;
   alertForm.status.value = conditions.status ?? 'recomendado';
+  alertForm.syncBeforeCheck.checked = Boolean(conditions.syncBeforeCheck);
   alertForm.recipients.value = recipients.join(', ');
   alertForm.messageTemplate.value = rule.messageTemplate || alertForm.messageTemplate.value;
   alertForm.isActive.checked = Boolean(rule.isActive);
@@ -339,7 +342,8 @@ async function saveAlertRule() {
     triggerType: formData.get('triggerType'),
     conditionsJson: JSON.stringify({
       affinityScore: Number.parseInt(formData.get('affinityScore'), 10) || 0,
-      status: formData.get('status')
+      status: formData.get('status'),
+      syncBeforeCheck: formData.get('syncBeforeCheck') === 'on'
     }),
     channelsJson: JSON.stringify(channels),
     recipientsJson: JSON.stringify(recipients),
@@ -496,6 +500,7 @@ function updatePreview() {
   const ruleName = alertForm.ruleName.value.trim() || 'regla configurada';
   const recipients = alertForm.recipients.value.trim() || 'Sin destinatarios';
   const affinity = alertForm.affinityScore.value || '85';
+  const syncBeforeCheck = alertForm.syncBeforeCheck?.checked;
 
   if (previewSubject) previewSubject.textContent = `Alerta: ${ruleName}`;
   if (previewRecipients) previewRecipients.textContent = recipients;
@@ -503,6 +508,7 @@ function updatePreview() {
     previewMessage.innerHTML = `
       <p>Se enviara un solo resumen con todas las oportunidades que superen ${escapeHtml(affinity)}% de afinidad.</p>
       <p>Incluira codigo, entidad, monto, cierre, modalidad, ubicacion y afinidad, ordenado de mayor a menor.</p>
+      <p>${syncBeforeCheck ? 'Antes de revisar, sincronizara SEACE usando tus filtros guardados.' : 'Revisara las oportunidades que ya estan guardadas.'}</p>
     `;
   }
 }

@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -60,6 +61,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection("GoogleAuth"));
 builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<SqlConnectionFactory>();
 builder.Services.AddSingleton<AuthRepository>();
@@ -67,6 +69,7 @@ builder.Services.AddSingleton<OpportunityRepository>();
 builder.Services.AddSingleton<CompanyProfileRepository>();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddSingleton<SeaceScraperService>();
+builder.Services.AddSingleton<SeaceDocumentTextService>();
 builder.Services.AddSingleton<CsvImportService>();
 builder.Services.AddSingleton<AffinityService>();
 builder.Services.AddSingleton<AlertRepository>();
@@ -305,6 +308,179 @@ app.MapGet("/api/opportunities/{id:int}/documents/{documentIndex:int}/download",
     }
 });
 
+app.MapGet("/api/opportunities/{id:int}/documents/{documentIndex:int}/view", async (
+    int id,
+    int documentIndex,
+    OpportunityRepository repository,
+    SeaceScraperService seaceScraperService,
+    IMemoryCache documentCache,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var opportunity = await repository.GetByIdAsync(id, cancellationToken);
+        if (opportunity is null)
+        {
+            return Results.NotFound(new { message = "No se encontro la oportunidad solicitada." });
+        }
+
+        var document = await GetOrFetchSeaceDocumentAsync(
+            documentCache,
+            opportunity,
+            documentIndex,
+            seaceScraperService,
+            cancellationToken);
+        if (document is null || document.Content.Length == 0)
+        {
+            return Results.NotFound(new { message = "No se pudo obtener el documento desde SEACE." });
+        }
+
+        if (!IsPdfDocument(document))
+        {
+            return Results.BadRequest(new { message = "El documento no es PDF. Usa Descargar para abrir este archivo." });
+        }
+
+        return Results.File(
+            document.Content,
+            "application/pdf",
+            enableRangeProcessing: true);
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        return Results.BadRequest(new { message = "Indice de documento invalido." });
+    }
+    catch (SqlException)
+    {
+        return Results.Problem(
+            title: "No se pudo consultar SQL Server.",
+            detail: "Revisa la conexion y ejecuta el script de base de datos.",
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SeaceDocumentView] Error mostrando PDF: {ex.Message}");
+        return Results.Problem(
+            title: "No se pudo mostrar el PDF.",
+            detail: "SEACE no devolvio el archivo solicitado.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapDelete("/api/opportunities/{id:int}/documents/{documentIndex:int}/cache", (
+    int id,
+    int documentIndex,
+    IMemoryCache documentCache) =>
+{
+    documentCache.Remove(GetSeaceDocumentCacheKey(id, documentIndex));
+    documentCache.Remove(GetSeaceDocumentContextCacheKey(id, documentIndex));
+    documentCache.Remove(GetSeaceDocumentExtractedTextCacheKey(id, documentIndex));
+    return Results.NoContent();
+});
+
+app.MapPost("/api/opportunities/{id:int}/documents/{documentIndex:int}/ask", async (
+    int id,
+    int documentIndex,
+    DocumentQuestionRequest request,
+    OpportunityRepository opportunityRepository,
+    SeaceScraperService seaceScraperService,
+    SeaceDocumentTextService documentTextService,
+    GeminiAnalysisService geminiService,
+    IMemoryCache documentCache,
+    HttpContext httpContext,
+    IOptions<JwtOptions> jwtOptions,
+    CancellationToken cancellationToken) =>
+{
+    var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+    if (!userId.HasValue)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!geminiService.IsConfigured)
+    {
+        return Results.BadRequest(new { message = "Gemini no esta configurado." });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        return Results.BadRequest(new { message = "Escribe una pregunta sobre el documento." });
+    }
+
+    try
+    {
+        var opportunity = await opportunityRepository.GetByIdAsync(id, cancellationToken);
+        if (opportunity is null)
+        {
+            return Results.NotFound(new { message = "No se encontro la oportunidad solicitada." });
+        }
+
+        var document = await GetOrFetchSeaceDocumentAsync(
+            documentCache,
+            opportunity,
+            documentIndex,
+            seaceScraperService,
+            cancellationToken);
+        if (document is null || document.Content.Length == 0)
+        {
+            return Results.NotFound(new { message = "No se pudo obtener el documento desde SEACE." });
+        }
+
+        var answerCacheKey = GetSeaceDocumentAnswerCacheKey(id, documentIndex, request.Question);
+        if (documentCache.TryGetValue<string>(answerCacheKey, out var cachedAnswer) &&
+            !string.IsNullOrWhiteSpace(cachedAnswer))
+        {
+            return Results.Ok(new { answer = cachedAnswer, cached = true });
+        }
+
+        var documentContext = GetOrBuildSeaceDocumentContext(
+            documentCache,
+            opportunity.OpportunityId,
+            documentIndex,
+            document,
+            documentTextService);
+
+        var extractedText = await GetOrExtractSeaceDocumentTextAsync(
+            documentCache,
+            opportunity,
+            documentIndex,
+            documentContext,
+            geminiService,
+            cancellationToken);
+        var answer = await geminiService.AnswerDocumentQuestionFromExtractedTextAsync(
+            opportunity,
+            extractedText,
+            request.Question,
+            cancellationToken);
+
+        documentCache.Set(answerCacheKey, answer, new MemoryCacheEntryOptions
+        {
+            SlidingExpiration = TimeSpan.FromMinutes(20),
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+        });
+
+        return Results.Ok(new { answer });
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        return Results.BadRequest(new { message = "Indice de documento invalido." });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(
+            title: "No se pudo responder con Gemini.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SeaceDocumentAsk] Error consultando documento: {ex.Message}");
+        return Results.Problem(
+            title: "No se pudo consultar el documento.",
+            detail: "Revisa la conexion con SEACE y vuelve a intentar.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.MapGet("/api/opportunities/{id:int}/ai-analysis", async (
     int id,
     OpportunityAiAnalysisRepository analysisRepository,
@@ -349,9 +525,12 @@ app.MapPost("/api/opportunities/{id:int}/ai-analysis", async (
     OpportunityAiAnalysisRepository analysisRepository,
     AffinityService affinityService,
     GeminiAnalysisService geminiService,
+    SeaceScraperService seaceScraperService,
+    SeaceDocumentTextService documentTextService,
     HttpContext httpContext,
     IOptions<JwtOptions> jwtOptions,
     CancellationToken cancellationToken,
+    [FromQuery] string? documentIndexes = null,
     [FromQuery] bool force = false) =>
 {
     var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
@@ -406,7 +585,13 @@ app.MapPost("/api/opportunities/{id:int}/ai-analysis", async (
         }
 
         var recommendation = await affinityService.AnalyzeOpportunityAsync(opportunity, userId.Value, cancellationToken);
-        var analysis = await geminiService.AnalyzeAsync(userId.Value, opportunity, recommendation, cancellationToken);
+        var documentContext = await BuildSeaceDocumentContextAsync(
+            opportunity,
+            seaceScraperService,
+            documentTextService,
+            documentIndexes,
+            cancellationToken);
+        var analysis = await geminiService.AnalyzeAsync(userId.Value, opportunity, recommendation, documentContext, cancellationToken);
         await analysisRepository.UpsertAsync(analysis, cancellationToken);
 
         var updated = await analysisRepository.GetByUserAndOpportunityAsync(userId.Value, id, cancellationToken) ?? analysis;
@@ -2319,6 +2504,242 @@ static IResult GoogleAuthPopupResult(string? token = null, string? redirectUrl =
     return Results.Content(html, "text/html; charset=utf-8");
 }
 
+static async Task<SeaceDocumentAnalysisContext?> BuildSeaceDocumentContextAsync(
+    Opportunity opportunity,
+    SeaceScraperService seaceScraperService,
+    SeaceDocumentTextService documentTextService,
+    string? selectedDocumentIndexes,
+    CancellationToken cancellationToken)
+{
+    var selectedIndexes = ParseSelectedDocumentIndexes(selectedDocumentIndexes).ToList();
+    var indexes = selectedIndexes.Count > 0
+        ? selectedIndexes.Take(3).ToList()
+        : GetRelevantSeaceDocumentIndexes(opportunity.SeaceDocumentsJson).Take(3).ToList();
+    if (indexes.Count == 0)
+    {
+        return null;
+    }
+
+    var documents = new List<SeaceDocumentDownloadResult>();
+    foreach (var index in indexes)
+    {
+        try
+        {
+            var document = await seaceScraperService.FetchDocumentAsync(opportunity, index, cancellationToken);
+            if (document is not null)
+            {
+                documents.Add(document);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Console.WriteLine($"[SeaceDocumentAI] No se pudo obtener documento {index}: {ex.Message}");
+        }
+    }
+
+    return documents.Count == 0 ? null : documentTextService.BuildContext(documents);
+}
+
+static IEnumerable<int> ParseSelectedDocumentIndexes(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return Array.Empty<int>();
+    }
+
+    return value
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(item => int.TryParse(item, out var index) ? index : -1)
+        .Where(index => index >= 0)
+        .Distinct()
+        .ToList();
+}
+
+static IEnumerable<int> GetRelevantSeaceDocumentIndexes(string documentsJson)
+{
+    if (string.IsNullOrWhiteSpace(documentsJson))
+    {
+        return Array.Empty<int>();
+    }
+
+    try
+    {
+        using var document = JsonDocument.Parse(documentsJson);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<int>();
+        }
+
+        return document.RootElement.EnumerateArray()
+            .Select((item, index) => new
+            {
+                Index = index,
+                Text = string.Join(" ", new[]
+                {
+                    ReadJsonString(item, "documento"),
+                    ReadJsonString(item, "archivo"),
+                    ReadJsonString(item, "etapa")
+                })
+            })
+            .OrderByDescending(item => ScoreSeaceDocument(item.Text))
+            .ThenBy(item => item.Index)
+            .Select(item => item.Index)
+            .ToList();
+    }
+    catch (JsonException)
+    {
+        return Array.Empty<int>();
+    }
+}
+
+static int ScoreSeaceDocument(string value)
+{
+    var text = value.ToLowerInvariant();
+    var score = 0;
+    if (text.Contains("base")) score += 100;
+    if (text.Contains("termino") || text.Contains("tdr")) score += 50;
+    if (text.Contains("requer") || text.Contains("especific")) score += 40;
+    if (text.Contains("anexo")) score += 20;
+    if (text.Contains("zip") || text.Contains("pdf")) score += 10;
+    return score;
+}
+
+static string ReadJsonString(JsonElement element, string propertyName) =>
+    element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+        ? value.GetString() ?? string.Empty
+        : string.Empty;
+
+static bool IsPdfDocument(SeaceDocumentDownloadResult document)
+{
+    if (document.ContentType.Contains("pdf", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    if (document.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    return document.Content.Length >= 4 &&
+        document.Content[0] == 0x25 &&
+        document.Content[1] == 0x50 &&
+        document.Content[2] == 0x44 &&
+        document.Content[3] == 0x46;
+}
+
+static string GetSeaceDocumentCacheKey(int opportunityId, int documentIndex) =>
+    $"seace-document:{opportunityId}:{documentIndex}";
+
+static string GetSeaceDocumentContextCacheKey(int opportunityId, int documentIndex) =>
+    $"seace-document-context:{opportunityId}:{documentIndex}";
+
+static string GetSeaceDocumentExtractedTextCacheKey(int opportunityId, int documentIndex) =>
+    $"seace-document-extracted-text:{opportunityId}:{documentIndex}";
+
+static string GetSeaceDocumentAnswerCacheKey(int opportunityId, int documentIndex, string question)
+{
+    var normalizedQuestion = string.Join(
+        " ",
+        question.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+    if (normalizedQuestion.Length > 160)
+    {
+        normalizedQuestion = normalizedQuestion[..160];
+    }
+
+    return $"seace-document-answer:{opportunityId}:{documentIndex}:{normalizedQuestion}";
+}
+
+static SeaceDocumentAnalysisContext GetOrBuildSeaceDocumentContext(
+    IMemoryCache documentCache,
+    int opportunityId,
+    int documentIndex,
+    SeaceDocumentDownloadResult document,
+    SeaceDocumentTextService documentTextService)
+{
+    var cacheKey = GetSeaceDocumentContextCacheKey(opportunityId, documentIndex);
+    if (documentCache.TryGetValue<SeaceDocumentAnalysisContext>(cacheKey, out var cachedContext) &&
+        cachedContext is not null)
+    {
+        return cachedContext;
+    }
+
+    var context = documentTextService.BuildContext(new[] { document });
+    documentCache.Set(cacheKey, context, new MemoryCacheEntryOptions
+    {
+        SlidingExpiration = TimeSpan.FromMinutes(15),
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(25)
+    });
+
+    return context;
+}
+
+static async Task<string> GetOrExtractSeaceDocumentTextAsync(
+    IMemoryCache documentCache,
+    Opportunity opportunity,
+    int documentIndex,
+    SeaceDocumentAnalysisContext documentContext,
+    GeminiAnalysisService geminiService,
+    CancellationToken cancellationToken)
+{
+    var cacheKey = GetSeaceDocumentExtractedTextCacheKey(opportunity.OpportunityId, documentIndex);
+    if (documentCache.TryGetValue<string>(cacheKey, out var cachedText) &&
+        !string.IsNullOrWhiteSpace(cachedText))
+    {
+        return cachedText;
+    }
+
+    var extractedText = await geminiService.ExtractDocumentTextAsync(
+        opportunity,
+        documentContext,
+        cancellationToken);
+
+    if (string.IsNullOrWhiteSpace(extractedText))
+    {
+        extractedText = documentContext.Summary;
+    }
+
+    documentCache.Set(cacheKey, extractedText, new MemoryCacheEntryOptions
+    {
+        SlidingExpiration = TimeSpan.FromMinutes(20),
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+    });
+
+    return extractedText;
+}
+
+static async Task<SeaceDocumentDownloadResult?> GetOrFetchSeaceDocumentAsync(
+    IMemoryCache documentCache,
+    Opportunity opportunity,
+    int documentIndex,
+    SeaceScraperService seaceScraperService,
+    CancellationToken cancellationToken)
+{
+    var cacheKey = GetSeaceDocumentCacheKey(opportunity.OpportunityId, documentIndex);
+    if (documentCache.TryGetValue<SeaceDocumentDownloadResult>(cacheKey, out var cachedDocument))
+    {
+        return cachedDocument;
+    }
+
+    var document = await seaceScraperService.FetchDocumentAsync(opportunity, documentIndex, cancellationToken);
+    if (document is null || document.Content.Length == 0)
+    {
+        return document;
+    }
+
+    if (document.Content.Length <= 50 * 1024 * 1024)
+    {
+        documentCache.Set(cacheKey, document, new MemoryCacheEntryOptions
+        {
+            SlidingExpiration = TimeSpan.FromMinutes(10),
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)
+        });
+    }
+
+    return document;
+}
+
 static async Task AutoUpdateOeceData(OeceDataService oeceService, OpportunityRepository repository)
 {
     while (true)
@@ -2374,5 +2795,7 @@ static async Task AutoUpdateOeceData(OeceDataService oeceService, OpportunityRep
         }
     }
 }
+
+sealed record DocumentQuestionRequest(string Question);
 
 

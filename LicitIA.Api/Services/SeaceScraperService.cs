@@ -71,6 +71,35 @@ public class SeaceScraperService
                 "seace-document-url.txt");
     }
 
+    public async Task<SeaceDocumentDownloadResult?> FetchDocumentAsync(
+        Opportunity opportunity,
+        int documentIndex,
+        CancellationToken cancellationToken = default)
+    {
+        var downloadUrl = await CreateDocumentDownloadUrlAsync(opportunity, documentIndex, cancellationToken);
+        if (string.IsNullOrWhiteSpace(downloadUrl))
+        {
+            return null;
+        }
+
+        using var response = await _httpClient.GetAsync(downloadUrl, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine($"[SeaceScraper] SEACE respondio {(int)response.StatusCode} al obtener documento para IA.");
+            return null;
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        var headerContentType = response.Content.Headers.ContentType?.MediaType;
+        var guessedContentType = GuessContentType(downloadUrl);
+        var contentType = string.IsNullOrWhiteSpace(headerContentType) ||
+            headerContentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
+                ? guessedContentType
+                : headerContentType;
+        var fileName = GetFileNameFromDownloadUrl(downloadUrl, $"documento-seace-{documentIndex + 1}");
+        return new SeaceDocumentDownloadResult(bytes, contentType, SanitizeFileName(fileName));
+    }
+
     public async Task<string> CreateDocumentDownloadUrlAsync(
         Opportunity opportunity,
         int documentIndex,
@@ -202,7 +231,21 @@ public class SeaceScraperService
             fileName = fileName.Replace(invalid, '_');
         }
 
-        return fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? fileName : $"{fileName}.pdf";
+        return string.IsNullOrWhiteSpace(Path.GetExtension(fileName)) ? $"{fileName}.pdf" : fileName;
+    }
+
+    private static string GuessContentType(string url)
+    {
+        var cleanUrl = url.Split('?', 2)[0];
+        return Path.GetExtension(cleanUrl).ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            ".zip" => "application/zip",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".txt" => "text/plain",
+            _ => "application/octet-stream"
+        };
     }
 
     private async Task OpenSearchPageAsync(IPage page)

@@ -25,6 +25,8 @@
         <a class="nav-item active" href="oportunidades.html">Oportunidades</a>
         <a class="nav-item" href="seguimiento.html">Seguimiento</a>
         <a class="nav-item" href="alertas.html">Alertas</a>
+        <a class="nav-item" href="analisis-entidades.html">Analisis Entidades</a>
+        <a class="nav-item" href="configuracion.html">Configuracion</a>
       </nav>
 
       <div class="sidebar-card">
@@ -59,7 +61,7 @@
 
       <nav class="page-tabs" aria-label="Secciones del detalle">
         <a class="active" href="#resumen">Resumen</a>
-        <a href="#ia">Analisis IA</a>
+        <a href="#ia">Análisis de oportunidad</a>
         <a href="#documentos">Documentos</a>
       </nav>
 
@@ -130,8 +132,8 @@
           <article class="panel-card detail-block detail-tab-panel" id="ia" data-detail-tab="ia" hidden>
             <div class="card-header">
               <div>
-                <p class="eyebrow">Analisis IA</p>
-                <h3>Analisis avanzado con Gemini</h3>
+                <p class="eyebrow">Análisis de oportunidad</p>
+                <h3>Resumen avanzado con Gemini</h3>
               </div>
               <span class="tag" id="aiQuotaTag">IA opcional</span>
             </div>
@@ -189,6 +191,57 @@
     </main>
   </div>
 
+  <div class="pdf-viewer-modal" id="pdfViewerModal" aria-hidden="true">
+    <div class="pdf-viewer-shell" role="dialog" aria-modal="true" aria-labelledby="pdfViewerTitle">
+      <section class="pdf-viewer-document">
+        <header class="pdf-viewer-header">
+          <div>
+            <p class="eyebrow">Documento SEACE</p>
+            <h2 id="pdfViewerTitle">Visor PDF</h2>
+          </div>
+          <div class="pdf-viewer-actions">
+            <a class="secondary-button" id="pdfViewerOpenTab" href="#" target="_blank" rel="noopener">Abrir en pesta&ntilde;a</a>
+            <button class="secondary-button" id="closePdfViewer" type="button">Cerrar documento</button>
+          </div>
+        </header>
+        <iframe id="pdfViewerFrame" title="Documento PDF SEACE"></iframe>
+      </section>
+
+      <aside class="pdf-chat-panel">
+        <header class="pdf-chat-header">
+          <p class="eyebrow">Asistente documental</p>
+          <h3>Gemini</h3>
+          <span id="pdfChatDocumentName">Documento SEACE</span>
+        </header>
+        <div class="pdf-chat-messages" id="pdfChatMessages" aria-live="polite">
+          <div class="pdf-chat-message assistant">
+            <strong>Gemini</strong>
+            <p>Preg&uacute;ntame sobre requisitos, criterios, penalidades o documentos que debes presentar.</p>
+          </div>
+        </div>
+
+        <div class="pdf-quick-questions" id="pdfQuickQuestions">
+          <button class="pdf-quick-toggle" id="pdfQuickToggle" type="button" aria-expanded="true">
+            <span>Preguntas frecuentes</span>
+            <span class="pdf-quick-toggle-label">Ocultar</span>
+          </button>
+          <div class="pdf-quick-question-list">
+            <button type="button" data-pdf-question="&iquest;Cu&aacute;les son las especificaciones t&eacute;cnicas?">&iquest;Cu&aacute;les son las especificaciones t&eacute;cnicas?</button>
+            <button type="button" data-pdf-question="&iquest;Hay requisitos de admisibilidad? &iquest;Cu&aacute;les?">&iquest;Hay requisitos de admisibilidad? &iquest;Cu&aacute;les?</button>
+            <button type="button" data-pdf-question="&iquest;Cu&aacute;les son los criterios de evaluaci&oacute;n y c&oacute;mo obtengo el mejor puntaje?">Criterios de evaluaci&oacute;n y mejor puntaje</button>
+            <button type="button" data-pdf-question="&iquest;Qu&eacute; documentos debo presentar en mi oferta?">Documentos que debo presentar</button>
+            <button type="button" data-pdf-question="&iquest;Existen multas, penalidades o sanciones? &iquest;Cu&aacute;les?">Multas, penalidades o sanciones</button>
+          </div>
+        </div>
+
+        <form class="pdf-chat-form" id="pdfChatForm">
+          <input id="pdfQuestionInput" type="text" placeholder="Haz una pregunta..." autocomplete="off">
+          <button type="submit">Enviar</button>
+        </form>
+        <p class="pdf-chat-note">Gemini puede generar respuestas imprecisas. Valida contra las bases oficiales.</p>
+      </aside>
+    </div>
+  </div>
   <script src="script.js?v=20260517-2"></script>
 </body>
 </html>

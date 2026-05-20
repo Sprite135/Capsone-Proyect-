@@ -1,4 +1,6 @@
 using LicitIA.Api.Data;
+using System.Net;
+using System.Text.Json;
 
 namespace LicitIA.Api.Services
 {
@@ -6,6 +8,7 @@ namespace LicitIA.Api.Services
     {
         private readonly AlertService _alertService;
         private readonly OpportunityRepository _opportunityRepository;
+        private readonly SeaceScraperService _seaceScraperService;
         private readonly AffinityService _affinityService;
         private readonly CompanyProfileRepository _profileRepository;
         private readonly NotificationRepository _notificationRepository;
@@ -14,12 +17,14 @@ namespace LicitIA.Api.Services
         public AlertSchedulerService(
             AlertService alertService,
             OpportunityRepository opportunityRepository,
+            SeaceScraperService seaceScraperService,
             AffinityService affinityService,
             CompanyProfileRepository profileRepository,
             NotificationRepository notificationRepository)
         {
             _alertService = alertService;
             _opportunityRepository = opportunityRepository;
+            _seaceScraperService = seaceScraperService;
             _affinityService = affinityService;
             _profileRepository = profileRepository;
             _notificationRepository = notificationRepository;
@@ -135,6 +140,13 @@ namespace LicitIA.Api.Services
 
             Console.WriteLine($"[AlertScheduler] Found {rules.Count} rules for user {profile.UserId}");
 
+            if (rules.Any(rule => rule.IsActive && ShouldSyncSeaceBeforeCheck(rule)))
+            {
+                var syncCount = await SyncSeaceForProfileAsync(profile, cancellationToken);
+                Console.WriteLine($"[AlertScheduler] SEACE sync before alerts saved {syncCount} opportunities for user {profile.UserId}");
+                opportunities = (await _opportunityRepository.GetAllAsync(cancellationToken)).ToList();
+            }
+
             foreach (var rule in rules.Where(r => r.IsActive))
             {
                 try
@@ -210,6 +222,96 @@ namespace LicitIA.Api.Services
             }
 
             return matches.Count;
+        }
+
+        private async Task<int> SyncSeaceForProfileAsync(Models.CompanyProfile profile, CancellationToken cancellationToken)
+        {
+            if (!profile.UserId.HasValue)
+            {
+                return 0;
+            }
+
+            var callYear = profile.SeaceCallYear > 0 ? profile.SeaceCallYear : DateTime.UtcNow.Year;
+            Console.WriteLine($"[AlertScheduler] Syncing SEACE before alert check. Year: {callYear}, Description: {profile.SeaceObjectDescription}");
+
+            var scraped = await _seaceScraperService.ScrapeOpportunitiesAsync(
+                maxResults: 30,
+                cancellationToken: cancellationToken,
+                objectDescription: profile.SeaceObjectDescription,
+                callYear: callYear,
+                contractObject: profile.SeaceContractObject,
+                entityAcronym: profile.SeaceEntityAcronym,
+                department: profile.SeaceDepartment,
+                province: profile.SeaceProvince,
+                district: profile.SeaceDistrict);
+
+            await _opportunityRepository.ClearAllOpportunitiesAsync(cancellationToken);
+
+            if (scraped.Count == 0)
+            {
+                return 0;
+            }
+
+            var ranked = await _affinityService.RankOpportunitiesAsync(scraped, profile.UserId.Value, cancellationToken);
+            var savedCount = 0;
+            for (var i = 0; i < ranked.Count; i++)
+            {
+                var item = ranked[i];
+                try
+                {
+                    await _opportunityRepository.InsertOpportunityAsync(new Models.Opportunity
+                    {
+                        ProcessCode = item.ProcessCode,
+                        Title = item.Title,
+                        EntityName = item.EntityName,
+                        EstimatedAmount = item.EstimatedAmount,
+                        ClosingDate = item.ClosingDate,
+                        Category = item.Category,
+                        Modality = item.Modality,
+                        MatchScore = item.MatchScore,
+                        MatchedKeywordsCount = item.MatchedKeywordsCount,
+                        Summary = item.Description,
+                        Location = item.Location,
+                        IsPriority = item.MatchScore >= 85,
+                        PublishedDate = item.PublishedDate,
+                        SeaceIndex = i + 1,
+                        SelectionType = item.SelectionType,
+                        ConvocationNumber = item.ConvocationNumber,
+                        ApplicableRegulation = item.ApplicableRegulation,
+                        SeaceVersion = item.SeaceVersion,
+                        EntityLegalAddress = item.EntityLegalAddress,
+                        EntityWebsite = item.EntityWebsite,
+                        EntityPhone = item.EntityPhone,
+                        ContractObject = item.ContractObject,
+                        ParticipationCost = item.ParticipationCost,
+                        BasesReproductionCost = item.BasesReproductionCost,
+                        SeaceDetailJson = item.SeaceDetailJson,
+                        SeaceScheduleJson = item.SeaceScheduleJson,
+                        SeaceDocumentsJson = item.SeaceDocumentsJson
+                    }, cancellationToken);
+                    savedCount++;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[AlertScheduler] Error saving synced SEACE opportunity {item.ProcessCode}: {ex.Message}");
+                }
+            }
+
+            return savedCount;
+        }
+
+        private static bool ShouldSyncSeaceBeforeCheck(Models.AlertRule rule)
+        {
+            try
+            {
+                var conditions = System.Text.Json.JsonDocument.Parse(rule.ConditionsJson);
+                return conditions.RootElement.TryGetProperty("syncBeforeCheck", out var value) &&
+                    value.ValueKind == System.Text.Json.JsonValueKind.True;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private bool ShouldTriggerAlert(Models.AlertRule rule, Models.Opportunity opportunity, bool force)
@@ -301,8 +403,15 @@ namespace LicitIA.Api.Services
 
         private static string BuildEmailSummaryMessage(Models.AlertRule rule, List<AlertOpportunityMatch> matches)
         {
-            var lines = matches
+            var orderedMatches = matches
                 .OrderByDescending(match => match.AffinityScore)
+                .ToList();
+            var highAffinityCount = orderedMatches.Count(match => match.AffinityScore >= 85);
+            var urgentCount = orderedMatches.Count(match => IsClosingSoon(match.Opportunity.ClosingDate));
+            var bestMatch = orderedMatches.FirstOrDefault()?.AffinityScore ?? 0;
+            var threshold = GetAffinityThreshold(rule);
+
+            var cards = orderedMatches
                 .Select((match, index) =>
                 {
                     var opportunity = match.Opportunity;
@@ -310,21 +419,153 @@ namespace LicitIA.Api.Services
                         ? $"S/ {opportunity.EstimatedAmount:N2}"
                         : "No disponible";
                     var closingDate = opportunity.ClosingDate?.ToString("dd/MM/yyyy") ?? "No disponible";
+                    var publishedDate = opportunity.PublishedDate?.ToString("dd/MM/yyyy") ?? "No disponible";
+                    var priorityLabel = GetPriorityLabel(match.AffinityScore);
+                    var priorityClass = GetPriorityClass(match.AffinityScore);
+                    var reason = BuildRecommendationReason(opportunity, match.AffinityScore);
+                    var closingBadge = IsClosingSoon(opportunity.ClosingDate)
+                        ? "<span class='status-badge urgent'>Vence pronto</span>"
+                        : "<span class='status-badge neutral'>En plazo</span>";
 
                     return $@"
-<strong>{index + 1}. {opportunity.ProcessCode}</strong><br>
-Afinidad: <strong>{match.AffinityScore}%</strong><br>
-Objeto: {opportunity.Title}<br>
-Entidad: {opportunity.EntityName}<br>
-Monto estimado: {amount}<br>
-Cierre: {closingDate}<br>
-Modalidad: {opportunity.Modality}<br>
-Ubicacion: {opportunity.Location}<br>";
+<article class='opportunity-card'>
+    <div class='card-topline'>
+        <span class='rank'>#{index + 1}</span>
+        <span class='score {priorityClass}'>{match.AffinityScore}%</span>
+    </div>
+    <h3>{Encode(opportunity.ProcessCode)}</h3>
+    <p class='entity'>{Encode(opportunity.EntityName)}</p>
+    <p class='title'>{Encode(opportunity.Title)}</p>
+    <div class='meta-grid'>
+        <div><span>Monto</span><strong>{Encode(amount)}</strong></div>
+        <div><span>Cierre</span><strong>{Encode(closingDate)}</strong></div>
+        <div><span>Publicado</span><strong>{Encode(publishedDate)}</strong></div>
+        <div><span>Modalidad</span><strong>{Encode(opportunity.Modality)}</strong></div>
+        <div><span>Ubicacion</span><strong>{Encode(opportunity.Location)}</strong></div>
+        <div><span>Categoria</span><strong>{Encode(opportunity.Category)}</strong></div>
+    </div>
+    <div class='card-footer'>
+        <span class='status-badge {priorityClass}'>{priorityLabel}</span>
+        {closingBadge}
+    </div>
+    <p class='reason'><strong>Motivo:</strong> {Encode(reason)}</p>
+</article>";
                 });
 
             return $@"
-La regla <strong>{rule.Name}</strong> encontro {matches.Count} oportunidad(es) que cumplen la afinidad configurada.<br><br>
-{string.Join("<hr>", lines)}";
+<section class='alert-intro'>
+    <p>La regla <strong>{Encode(rule.Name)}</strong> encontro oportunidades que superan la afinidad configurada.</p>
+</section>
+<section class='summary-grid'>
+    <div><span>Total</span><strong>{matches.Count}</strong></div>
+    <div><span>Alta afinidad</span><strong>{highAffinityCount}</strong></div>
+    <div><span>Mayor afinidad</span><strong>{bestMatch}%</strong></div>
+    <div><span>Vencen pronto</span><strong>{urgentCount}</strong></div>
+</section>
+<p class='rule-note'>Umbral configurado: <strong>{threshold}%</strong>. Revisa primero las oportunidades con mayor afinidad y las que estan cerca de su fecha de cierre.</p>
+<section class='opportunity-list'>
+    {string.Join("", cards)}
+</section>";
+        }
+
+        private static int GetAffinityThreshold(Models.AlertRule rule)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(rule.ConditionsJson);
+                if (doc.RootElement.TryGetProperty("affinityThreshold", out var thresholdElement)
+                    && thresholdElement.TryGetInt32(out var threshold))
+                {
+                    return threshold;
+                }
+            }
+            catch
+            {
+                return 80;
+            }
+
+            return 80;
+        }
+
+        private static bool IsClosingSoon(DateTime? closingDate)
+        {
+            if (!closingDate.HasValue)
+            {
+                return false;
+            }
+
+            var daysLeft = (closingDate.Value.Date - DateTime.Today).TotalDays;
+            return daysLeft >= 0 && daysLeft <= 5;
+        }
+
+        private static string GetPriorityLabel(int affinityScore)
+        {
+            if (affinityScore >= 85)
+            {
+                return "Alta afinidad";
+            }
+
+            if (affinityScore >= 70)
+            {
+                return "Afinidad media";
+            }
+
+            return "Afinidad baja";
+        }
+
+        private static string GetPriorityClass(int affinityScore)
+        {
+            if (affinityScore >= 85)
+            {
+                return "high";
+            }
+
+            if (affinityScore >= 70)
+            {
+                return "medium";
+            }
+
+            return "low";
+        }
+
+        private static string BuildRecommendationReason(Models.Opportunity opportunity, int affinityScore)
+        {
+            var parts = new List<string>();
+
+            if (affinityScore >= 85)
+            {
+                parts.Add("coincide fuertemente con las preferencias configuradas");
+            }
+            else if (affinityScore >= 70)
+            {
+                parts.Add("tiene coincidencias relevantes con tus criterios");
+            }
+            else
+            {
+                parts.Add("cumple el umbral minimo definido en la regla");
+            }
+
+            if (opportunity.MatchedKeywordsCount > 0)
+            {
+                parts.Add($"incluye {opportunity.MatchedKeywordsCount} coincidencia(s) de palabras clave");
+            }
+
+            if (IsClosingSoon(opportunity.ClosingDate))
+            {
+                parts.Add("requiere revision rapida por cercania de cierre");
+            }
+
+            return string.Join("; ", parts) + ".";
+        }
+
+        private static string DisplayValue(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "No disponible" : value.Trim();
+        }
+
+        private static string Encode(string? value)
+        {
+            return WebUtility.HtmlEncode(DisplayValue(value));
         }
 
         private sealed record AlertOpportunityMatch(Models.Opportunity Opportunity, int AffinityScore);

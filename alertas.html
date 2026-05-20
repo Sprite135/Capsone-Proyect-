@@ -94,36 +94,69 @@
             <form id="alertRuleForm" class="alert-form">
               <input type="hidden" id="ruleId" name="ruleId">
 
-              <div class="form-group">
-                <label for="ruleName">Nombre de la regla</label>
-                <input type="text" id="ruleName" name="ruleName" placeholder="Ej: Alertas de alta afinidad" required>
-              </div>
+              <section class="form-section">
+                <div class="form-section-title">
+                  <p class="eyebrow">Datos</p>
+                  <h4>Identificacion de la regla</h4>
+                </div>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="ruleName">Nombre de la regla</label>
+                    <input type="text" id="ruleName" name="ruleName" placeholder="Ej: Alertas de alta afinidad" required>
+                  </div>
 
-              <div class="form-group">
-                <label for="triggerType">Tipo de disparador</label>
-                <select id="triggerType" name="triggerType" class="form-control" required>
-                  <option value="alta_afinidad">Alta afinidad</option>
-                  <option value="nueva_oportunidad">Nueva oportunidad</option>
-                  <option value="cierre_proximo">Cierre proximo</option>
-                </select>
-              </div>
+                  <div class="form-group">
+                    <label for="triggerType">Tipo de disparador</label>
+                    <select id="triggerType" name="triggerType" class="form-control" required>
+                      <option value="alta_afinidad">Alta afinidad</option>
+                      <option value="nueva_oportunidad">Nueva oportunidad</option>
+                      <option value="cierre_proximo">Cierre proximo</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
 
-              <div class="form-group">
-                <label for="affinityScore">Afinidad minima (%)</label>
-                <input type="number" id="affinityScore" name="affinityScore" min="0" max="100" value="85" required>
-              </div>
+              <section class="form-section">
+                <div class="form-section-title">
+                  <p class="eyebrow">Condiciones</p>
+                  <h4>Afinidad y estado requerido</h4>
+                </div>
+                <div class="form-grid compact">
+                  <div class="form-group">
+                    <label for="affinityScore">Afinidad minima (%)</label>
+                    <input type="number" id="affinityScore" name="affinityScore" min="0" max="100" value="85" required>
+                  </div>
 
-              <div class="form-group">
-                <label for="status">Estado requerido</label>
-                <select id="status" name="status" class="form-control">
-                  <option value="recomendado">Recomendado</option>
-                  <option value="cualquiera">Cualquiera</option>
-                </select>
-                <p>La regla se evalua con las oportunidades cargadas y la afinidad calculada para tu perfil.</p>
-              </div>
+                  <div class="form-group">
+                    <label for="status">Estado requerido</label>
+                    <select id="status" name="status" class="form-control">
+                      <option value="recomendado">Recomendado</option>
+                      <option value="cualquiera">Cualquiera</option>
+                    </select>
+                  </div>
+                </div>
+                <p class="field-hint">La regla se evalua con las oportunidades cargadas y la afinidad calculada para tu perfil.</p>
+              </section>
 
-              <div class="form-group">
-                <label>Canales</label>
+              <section class="form-section">
+                <div class="form-section-title">
+                  <p class="eyebrow">SEACE</p>
+                  <h4>Actualizacion antes de alertar</h4>
+                </div>
+                <label class="checkbox-label option-card">
+                  <input type="checkbox" id="syncBeforeCheck" name="syncBeforeCheck">
+                  <span>
+                    <strong>Sincronizar SEACE antes de revisar</strong>
+                    <small>Usa tus filtros guardados, actualiza oportunidades y luego envia el resumen si hay coincidencias.</small>
+                  </span>
+                </label>
+              </section>
+
+              <section class="form-section">
+                <div class="form-section-title">
+                  <p class="eyebrow">Entrega</p>
+                  <h4>Canales y destinatarios</h4>
+                </div>
                 <div class="checkbox-group">
                   <label class="checkbox-label">
                     <input type="checkbox" name="channels" value="panel" checked>
@@ -138,24 +171,26 @@
                     <span>Slack proximamente</span>
                   </label>
                 </div>
-              </div>
 
-              <div class="form-group">
-                <label for="recipients">Destinatarios</label>
-                <input type="text" id="recipients" name="recipients" placeholder="comercial@empresa.com, gerencia@empresa.com">
-                <p>Separa varios correos con coma. Solo se usan cuando el canal Correo esta activo.</p>
-              </div>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="recipients">Destinatarios</label>
+                    <input type="text" id="recipients" name="recipients" placeholder="comercial@empresa.com, gerencia@empresa.com">
+                    <p>Separa varios correos con coma.</p>
+                  </div>
 
-              <div class="form-group">
-                <label for="messageTemplate">Nota interna opcional</label>
-                <textarea id="messageTemplate" name="messageTemplate" rows="4" placeholder="Ej: Priorizar oportunidades de alta afinidad para revision comercial."></textarea>
-                <p>El correo usa un resumen automatico con todas las oportunidades encontradas.</p>
-              </div>
+                  <div class="form-group">
+                    <label for="messageTemplate">Nota interna opcional</label>
+                    <textarea id="messageTemplate" name="messageTemplate" rows="3" placeholder="Ej: Priorizar oportunidades de alta afinidad para revision comercial."></textarea>
+                    <p>El correo usa un resumen automatico con todas las oportunidades encontradas.</p>
+                  </div>
+                </div>
 
-              <label class="checkbox-label">
-                <input type="checkbox" id="isActive" name="isActive" checked>
-                <span>Regla activa</span>
-              </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="isActive" name="isActive" checked>
+                  <span>Regla activa</span>
+                </label>
+              </section>
 
               <div class="inline-actions">
                 <button class="primary-button" type="submit">Guardar regla</button>
@@ -164,21 +199,6 @@
             </form>
           </article>
 
-          <article class="panel-card">
-            <div class="card-header">
-              <div>
-                <p class="eyebrow">Historial</p>
-                <h3>Ultimos envios generados por reglas</h3>
-              </div>
-              <button id="markAllReadButton" class="secondary-button small-button" type="button">Marcar leidas</button>
-            </div>
-            <ul id="notificationList" class="activity-list">
-              <li>
-                <strong>Cargando historial</strong>
-                <span>Estamos consultando tus notificaciones.</span>
-              </li>
-            </ul>
-          </article>
         </div>
 
         <div class="side-stack">
@@ -216,30 +236,23 @@
               </div>
             </div>
           </article>
-
-          <article class="panel-card">
-            <div class="card-header">
-              <div>
-                <p class="eyebrow">Canales</p>
-                <h3>Distribucion disponible</h3>
-              </div>
-            </div>
-            <ul class="channel-list">
-              <li class="channel-item">
-                <strong>Panel interno</strong>
-                <span>Guarda una notificacion en el panel cuando una oportunidad cumple la regla.</span>
-              </li>
-              <li class="channel-item">
-                <strong>Correo inmediato</strong>
-                <span>Envia el mensaje a los destinatarios configurados.</span>
-              </li>
-              <li class="channel-item">
-                <strong>Slack proximamente</strong>
-                <span>El canal queda bloqueado hasta que se conecte una integracion real.</span>
-              </li>
-            </ul>
-          </article>
         </div>
+      </section>
+
+      <section class="panel-card alert-history-panel">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Historial</p>
+            <h3>Ultimos envios generados por reglas</h3>
+          </div>
+          <button id="markAllReadButton" class="secondary-button small-button" type="button">Marcar leidas</button>
+        </div>
+        <ul id="notificationList" class="activity-list">
+          <li>
+            <strong>Cargando historial</strong>
+            <span>Estamos consultando tus notificaciones.</span>
+          </li>
+        </ul>
       </section>
 
       <p id="message" class="message" aria-live="polite"></p>

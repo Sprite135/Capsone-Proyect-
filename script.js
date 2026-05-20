@@ -32,6 +32,17 @@ const detailBasesCost = document.getElementById("detailBasesCost");
 const detailScheduleList = document.getElementById("detailScheduleList");
 const detailSeaceFields = document.getElementById("detailSeaceFields");
 const detailDocumentsList = document.getElementById("detailDocumentsList");
+const pdfViewerModal = document.getElementById("pdfViewerModal");
+const pdfViewerFrame = document.getElementById("pdfViewerFrame");
+const pdfViewerTitle = document.getElementById("pdfViewerTitle");
+const pdfViewerOpenTab = document.getElementById("pdfViewerOpenTab");
+const closePdfViewer = document.getElementById("closePdfViewer");
+const pdfChatDocumentName = document.getElementById("pdfChatDocumentName");
+const pdfChatMessages = document.getElementById("pdfChatMessages");
+const pdfChatForm = document.getElementById("pdfChatForm");
+const pdfQuestionInput = document.getElementById("pdfQuestionInput");
+const pdfQuickQuestions = document.getElementById("pdfQuickQuestions");
+const pdfQuickToggle = document.getElementById("pdfQuickToggle");
 const syncSeaceButton = document.getElementById('syncSeaceButton');
 const seaceFilterModal = document.getElementById("seaceFilterModal");
 const closeSeaceFilterModal = document.getElementById("closeSeaceFilterModal");
@@ -57,6 +68,8 @@ let profileKeywords = { preferred: [], excluded: [], seaceObjectDescription: "",
 let currentProfile = null;
 let currentDetailOpportunityId = null;
 let currentDetailOpportunity = null;
+let currentPdfDocumentIndex = null;
+let pdfQuestionInFlight = false;
 
 const seaceProvincesByDepartment = {
   Amazonas: ["Bagua", "Bongara", "Chachapoyas", "Condorcanqui", "Luya", "Rodriguez de Mendoza", "Utcubamba"],
@@ -90,7 +103,7 @@ const seaceDistrictsByProvince = {
   Barranca: ["Barranca", "Paramonga", "Pativilca", "Supe", "Supe Puerto"],
   Cajatambo: ["Cajatambo", "Copa", "Gorgor", "Huancapon", "Manas"],
   Canta: ["Arahuay", "Canta", "Huamantanga", "Huaros", "Lachaqui", "San Buenaventura", "Santa Rosa de Quives"],
-  "CaÃ±ete": ["Asia", "Calango", "Cerro Azul", "Chilca", "Coayllo", "Imperial", "Lunahuana", "Mala", "Nuevo Imperial", "Pacaran", "Quilmana", "San Antonio", "San Luis", "San Vicente de Cañete", "Santa Cruz de Flores", "Zuñiga"],
+  "Cañete": ["Asia", "Calango", "Cerro Azul", "Chilca", "Coayllo", "Imperial", "Lunahuana", "Mala", "Nuevo Imperial", "Pacarán", "Quilmaná", "San Antonio", "San Luis", "San Vicente de Cañete", "Santa Cruz de Flores", "Zúñiga"],
   Huaral: ["Atavillos Alto", "Atavillos Bajo", "Aucallama", "Chancay", "Huaral", "Ihuari", "Lampian", "Pacaraos", "San Miguel de Acos", "Santa Cruz de Andamarca", "Sumbilca", "Veintisiete de Noviembre"],
   Huarochiri: ["Antioquia", "Callahuanca", "Carampoma", "Chicla", "Cuenca", "Huachupampa", "Huanza", "Huarochiri", "Lahuaytambo", "Langa", "Laraos", "Mariatana", "Matucana", "Ricardo Palma", "San Andres de Tupicocha", "San Antonio", "San Bartolome", "San Damian", "San Juan de Iris", "San Juan de Tantaranche", "San Lorenzo de Quinti", "San Mateo", "San Mateo de Otao", "San Pedro de Casta", "San Pedro de Huancayre", "Sangallaya", "Santa Cruz de Cocachacra", "Santa Eulalia", "Santiago de Anchucaya", "Santiago de Tuna", "Santo Domingo de los Olleros", "Surco"],
   Huaura: ["Ambar", "Caleta de Carquin", "Checras", "Huacho", "Hualmay", "Huaura", "Leoncio Prado", "Paccho", "Santa Leonor", "Santa Maria", "Sayan", "Vegueta"],
@@ -1327,7 +1340,7 @@ async function loadAiAnalysisStatus(opportunityId) {
 
     if (data.analysis) {
       renderAiAnalysis(data.analysis);
-      aiStatusText.textContent = "Analisis IA guardado. No consume cupo al volver a abrir esta oportunidad.";
+      aiStatusText.textContent = "Análisis de oportunidad guardado. No consume cupo al volver a abrir esta oportunidad.";
       return;
     }
 
@@ -1364,9 +1377,17 @@ async function requestAiAnalysis(opportunityId) {
   try {
     runAiAnalysisButton.disabled = true;
     runAiAnalysisButton.textContent = "Analizando...";
-    aiStatusText.textContent = "Gemini esta analizando la oportunidad. Esto puede tardar unos segundos.";
+    const selectedDocumentIndexes = getSelectedSeaceDocumentIndexes();
+    aiStatusText.textContent = selectedDocumentIndexes.length > 0
+      ? `Gemini esta analizando ${selectedDocumentIndexes.length} documento(s) seleccionado(s). Esto puede tardar unos segundos.`
+      : "Gemini esta analizando la oportunidad. Esto puede tardar unos segundos.";
 
-    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}/ai-analysis`, {
+    const query = new URLSearchParams({ force: "true" });
+    if (selectedDocumentIndexes.length > 0) {
+      query.set("documentIndexes", selectedDocumentIndexes.join(","));
+    }
+
+    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}/ai-analysis?${query.toString()}`, {
       method: "POST",
       headers: getAuthHeaders()
     });
@@ -1386,8 +1407,10 @@ async function requestAiAnalysis(opportunityId) {
     updateAiQuota(data);
     renderAiAnalysis(data.analysis);
     aiStatusText.textContent = data.fromCache
-      ? "Analisis IA recuperado desde cache."
-      : "Analisis IA generado y guardado correctamente.";
+      ? "Análisis de oportunidad recuperado desde caché."
+      : selectedDocumentIndexes.length > 0
+        ? "Análisis de oportunidad generado con los documentos seleccionados."
+        : "Análisis de oportunidad generado y guardado correctamente.";
   } catch (error) {
     aiStatusText.textContent = error.message || "No se pudo generar el analisis IA.";
   } finally {
@@ -1814,6 +1837,12 @@ function renderSeaceDocuments(documentsJson) {
   }
 
   detailDocumentsList.innerHTML = `
+    <div class="document-toolbar">
+      <span>Selecciona bases o anexos para analizarlos con Gemini.</span>
+      <button class="document-ai-btn" type="button" data-documents-ai-trigger>
+        Analizar seleccionados
+      </button>
+    </div>
     <div class="schedule-table-wrap">
       <table class="schedule-table document-table">
         <thead>
@@ -1829,15 +1858,25 @@ function renderSeaceDocuments(documentsJson) {
         <tbody>
           ${documents.map((item, index) => `
             <tr>
-              <td>${escapeHtml(item.numero || String(index + 1))}</td>
+              <td>
+                <label class="document-select-cell">
+                  <input type="checkbox" class="document-ai-checkbox" value="${index}">
+                  <span>${escapeHtml(item.numero || String(index + 1))}</span>
+                </label>
+              </td>
               <td>${escapeHtml(item.etapa || "-")}</td>
               <td>${escapeHtml(item.documento || "-")}</td>
               <td>${escapeHtml(item.archivo || "-")}</td>
               <td>${escapeHtml(item.fechaPublicacion || "-")}</td>
               <td>
-                <button class="document-open-btn" type="button" data-document-index="${index}">
-                  Descargar
-                </button>
+                <div class="document-actions">
+                  <button class="document-open-btn document-view-btn" type="button" data-document-view-index="${index}">
+                    Ver PDF
+                  </button>
+                  <button class="document-open-btn" type="button" data-document-index="${index}">
+                    Descargar
+                  </button>
+                </div>
               </td>
             </tr>
           `).join("")}
@@ -1849,6 +1888,39 @@ function renderSeaceDocuments(documentsJson) {
 
 if (detailDocumentsList) {
   detailDocumentsList.addEventListener("click", (event) => {
+    const analysisButton = event.target.closest("[data-documents-ai-trigger]");
+    if (analysisButton) {
+      if (!currentDetailOpportunityId) {
+        return;
+      }
+
+      const selectedDocumentIndexes = getSelectedSeaceDocumentIndexes();
+      if (selectedDocumentIndexes.length === 0) {
+        analysisButton.textContent = "Selecciona al menos uno";
+        window.setTimeout(() => {
+          analysisButton.textContent = "Analizar seleccionados";
+        }, 1600);
+        return;
+      }
+
+      detailTabLinks.forEach((item) => {
+        item.classList.toggle("active", item.getAttribute("href") === "#ia");
+      });
+      activateDetailTab("ia");
+      requestAiAnalysis(currentDetailOpportunityId);
+      return;
+    }
+
+    const viewButton = event.target.closest("[data-document-view-index]");
+    if (viewButton && currentDetailOpportunityId) {
+      const documentIndex = viewButton.dataset.documentViewIndex || "0";
+      const url = `${API_BASE}/api/opportunities/${encodeURIComponent(currentDetailOpportunityId)}/documents/${encodeURIComponent(documentIndex)}/view`;
+      currentPdfDocumentIndex = documentIndex;
+      resetPdfChat();
+      openPdfViewer(url, getDocumentDisplayName(documentIndex));
+      return;
+    }
+
     const button = event.target.closest(".document-open-btn");
     if (!button || !currentDetailOpportunityId) {
       return;
@@ -1860,6 +1932,224 @@ if (detailDocumentsList) {
   });
 }
 
+function getSelectedSeaceDocumentIndexes() {
+  if (!detailDocumentsList) {
+    return [];
+  }
+
+  return Array.from(detailDocumentsList.querySelectorAll(".document-ai-checkbox:checked"))
+    .map((checkbox) => Number.parseInt(checkbox.value, 10))
+    .filter((value) => Number.isInteger(value) && value >= 0)
+    .slice(0, 3);
+}
+
+function getDocumentDisplayName(documentIndex) {
+  const row = detailDocumentsList?.querySelector(`[data-document-view-index="${documentIndex}"]`)?.closest("tr");
+  if (!row) {
+    return "Documento SEACE";
+  }
+
+  const cells = row.querySelectorAll("td");
+  const documentName = cells[2]?.textContent?.trim();
+  return documentName || "Documento SEACE";
+}
+
+function openPdfViewer(url, title) {
+  if (!pdfViewerModal || !pdfViewerFrame) {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+
+  if (pdfViewerTitle) {
+    pdfViewerTitle.textContent = title || "Documento SEACE";
+  }
+  if (pdfViewerOpenTab) {
+    pdfViewerOpenTab.href = url;
+  }
+  if (pdfChatDocumentName) {
+    pdfChatDocumentName.textContent = title || "Documento SEACE";
+  }
+
+  pdfViewerFrame.src = url;
+  pdfViewerModal.classList.add("active");
+  pdfViewerModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+}
+
+function closePdfViewerModal() {
+  if (!pdfViewerModal) {
+    return;
+  }
+
+  clearPdfDocumentCache();
+  pdfViewerModal.classList.remove("active");
+  pdfViewerModal.setAttribute("aria-hidden", "true");
+  if (pdfViewerFrame) {
+    pdfViewerFrame.src = "about:blank";
+  }
+  currentPdfDocumentIndex = null;
+  document.body.classList.remove("modal-open");
+}
+
+function clearPdfDocumentCache() {
+  if (!currentDetailOpportunityId || currentPdfDocumentIndex === null) {
+    return;
+  }
+
+  const url = `${API_BASE}/api/opportunities/${encodeURIComponent(currentDetailOpportunityId)}/documents/${encodeURIComponent(currentPdfDocumentIndex)}/cache`;
+  fetch(url, {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  }).catch(() => {
+    // Si falla la limpieza manual, la API lo elimina por expiración.
+  });
+}
+
+if (closePdfViewer) {
+  closePdfViewer.addEventListener("click", closePdfViewerModal);
+}
+
+if (pdfViewerModal) {
+  pdfViewerModal.addEventListener("click", (event) => {
+    if (event.target === pdfViewerModal) {
+      closePdfViewerModal();
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && pdfViewerModal?.classList.contains("active")) {
+    closePdfViewerModal();
+  }
+});
+
+if (pdfChatForm) {
+  pdfChatForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = pdfQuestionInput?.value.trim() || "";
+    if (!question) {
+      return;
+    }
+
+    pdfQuestionInput.value = "";
+    await askPdfQuestion(question);
+  });
+}
+
+document.querySelectorAll("[data-pdf-question]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const question = button.getAttribute("data-pdf-question") || button.textContent || "";
+    await askPdfQuestion(question);
+  });
+});
+
+if (pdfQuickToggle && pdfQuickQuestions) {
+  pdfQuickToggle.addEventListener("click", () => {
+    const collapsed = pdfQuickQuestions.classList.toggle("collapsed");
+    pdfQuickToggle.setAttribute("aria-expanded", String(!collapsed));
+    const label = pdfQuickToggle.querySelector(".pdf-quick-toggle-label");
+    if (label) {
+      label.textContent = collapsed ? "Mostrar" : "Ocultar";
+    }
+  });
+}
+
+function resetPdfChat() {
+  if (!pdfChatMessages) {
+    return;
+  }
+
+  pdfChatMessages.innerHTML = `
+    <div class="pdf-chat-message assistant">
+      <strong>Gemini</strong>
+      <p>Preg\u00fantame sobre requisitos, criterios, penalidades o documentos que debes presentar.</p>
+    </div>
+  `;
+}
+
+async function askPdfQuestion(question) {
+  if (!currentDetailOpportunityId || currentPdfDocumentIndex === null) {
+    appendPdfChatMessage("assistant", "Abre primero un documento PDF para consultarlo.");
+    return;
+  }
+
+  if (pdfQuestionInFlight) {
+    appendPdfChatMessage("assistant", "Espera a que termine la respuesta actual antes de enviar otra pregunta.");
+    return;
+  }
+
+  pdfQuestionInFlight = true;
+  setPdfChatBusy(true);
+  appendPdfChatMessage("user", question);
+  const pending = appendPdfChatMessage("assistant", "Estoy preparando el texto del documento. La primera pregunta puede tardar un poco; luego respondere mas rapido.");
+  if (!pending) {
+    pdfQuestionInFlight = false;
+    setPdfChatBusy(false);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(currentDetailOpportunityId)}/documents/${encodeURIComponent(currentPdfDocumentIndex)}/ask`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ question })
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(data?.message || data?.detail || "No se pudo consultar el documento.");
+    }
+
+    pending.querySelector("p").innerHTML = formatPdfChatText(data?.answer || "No encontr\u00e9 una respuesta en el documento.");
+  } catch (error) {
+    pending.querySelector("p").innerHTML = formatPdfChatText(error.message || "No se pudo consultar el documento.");
+  } finally {
+    pdfQuestionInFlight = false;
+    setPdfChatBusy(false);
+  }
+}
+
+function setPdfChatBusy(isBusy) {
+  if (pdfQuestionInput) {
+    pdfQuestionInput.disabled = isBusy;
+  }
+
+  const submitButton = pdfChatForm?.querySelector("button[type='submit']");
+  if (submitButton) {
+    submitButton.disabled = isBusy;
+    submitButton.textContent = isBusy ? "Leyendo..." : "Enviar";
+  }
+
+  document.querySelectorAll("[data-pdf-question]").forEach((button) => {
+    button.disabled = isBusy;
+  });
+}
+
+function appendPdfChatMessage(role, text) {
+  if (!pdfChatMessages) {
+    return null;
+  }
+
+  const item = document.createElement("div");
+  item.className = `pdf-chat-message ${role}`;
+  item.innerHTML = `
+    <strong>${role === "user" ? "T\u00fa" : "Gemini"}</strong>
+    <p>${formatPdfChatText(text)}</p>
+  `;
+  pdfChatMessages.appendChild(item);
+  pdfChatMessages.scrollTop = pdfChatMessages.scrollHeight;
+  return item;
+}
+
+function formatPdfChatText(value) {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^- /gm, "\u2022 ")
+    .replace(/\n/g, "<br>");
+}
 function renderSeaceFields(detailJson) {
   if (!detailSeaceFields) {
     return;
