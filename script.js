@@ -70,6 +70,8 @@ let currentDetailOpportunityId = null;
 let currentDetailOpportunity = null;
 let currentPdfDocumentIndex = null;
 let pdfQuestionInFlight = false;
+let pdfDocumentPreparing = false;
+let pdfDocumentReady = false;
 
 const seaceProvincesByDepartment = {
   Amazonas: ["Bagua", "Bongara", "Chachapoyas", "Condorcanqui", "Luya", "Rodriguez de Mendoza", "Utcubamba"],
@@ -1918,6 +1920,7 @@ if (detailDocumentsList) {
       currentPdfDocumentIndex = documentIndex;
       resetPdfChat();
       openPdfViewer(url, getDocumentDisplayName(documentIndex));
+      preparePdfDocument();
       return;
     }
 
@@ -1988,6 +1991,9 @@ function closePdfViewerModal() {
     pdfViewerFrame.src = "about:blank";
   }
   currentPdfDocumentIndex = null;
+  pdfDocumentPreparing = false;
+  pdfDocumentReady = false;
+  setPdfChatBusy(false);
   document.body.classList.remove("modal-open");
 }
 
@@ -2059,17 +2065,85 @@ function resetPdfChat() {
     return;
   }
 
+  pdfDocumentPreparing = false;
+  pdfDocumentReady = false;
   pdfChatMessages.innerHTML = `
     <div class="pdf-chat-message assistant">
       <strong>Gemini</strong>
       <p>Preg\u00fantame sobre requisitos, criterios, penalidades o documentos que debes presentar.</p>
     </div>
   `;
+  setPdfChatBusy(false);
+}
+
+async function preparePdfDocument() {
+  if (!currentDetailOpportunityId || currentPdfDocumentIndex === null) {
+    return;
+  }
+
+  const preparedOpportunityId = currentDetailOpportunityId;
+  const preparedDocumentIndex = currentPdfDocumentIndex;
+  pdfDocumentPreparing = true;
+  pdfDocumentReady = false;
+  setPdfChatBusy(true, "Preparando...");
+  const thinking = appendPdfThinkingMessage([
+    "Preparando documento",
+    "Extrayendo texto del PDF",
+    "Guardando contexto temporal",
+    "Dejando el chat listo"
+  ]);
+  const pending = thinking?.element;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/opportunities/${encodeURIComponent(preparedOpportunityId)}/documents/${encodeURIComponent(preparedDocumentIndex)}/prepare`, {
+      method: "POST",
+      headers: getAuthHeaders()
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(data?.message || data?.detail || "No se pudo preparar el documento.");
+    }
+
+    if (preparedOpportunityId !== currentDetailOpportunityId || preparedDocumentIndex !== currentPdfDocumentIndex) {
+      return;
+    }
+
+    pdfDocumentReady = true;
+    thinking?.stop();
+    const answerTarget = pending?.querySelector("p");
+    if (answerTarget) {
+      answerTarget.innerHTML = formatPdfChatText("Documento preparado. Ya puedes preguntarme sobre sus secciones, requisitos, plazos o penalidades.");
+    }
+  } catch (error) {
+    if (preparedOpportunityId !== currentDetailOpportunityId || preparedDocumentIndex !== currentPdfDocumentIndex) {
+      return;
+    }
+
+    pdfDocumentReady = false;
+    thinking?.stop();
+    const answerTarget = pending?.querySelector("p");
+    if (answerTarget) {
+      answerTarget.innerHTML = formatPdfChatText(error.message || "No se pudo preparar el documento.");
+    }
+  } finally {
+    if (preparedOpportunityId === currentDetailOpportunityId && preparedDocumentIndex === currentPdfDocumentIndex) {
+      pdfDocumentPreparing = false;
+      setPdfChatBusy(false);
+    }
+  }
 }
 
 async function askPdfQuestion(question) {
   if (!currentDetailOpportunityId || currentPdfDocumentIndex === null) {
     appendPdfChatMessage("assistant", "Abre primero un documento PDF para consultarlo.");
+    return;
+  }
+
+  if (!pdfDocumentReady) {
+    appendPdfChatMessage("assistant", pdfDocumentPreparing
+      ? "Todavia estoy preparando el documento. Espera unos segundos antes de preguntar."
+      : "Primero necesito preparar el documento. Cierra y vuelve a abrir el PDF para intentarlo nuevamente.");
     return;
   }
 
@@ -2079,9 +2153,10 @@ async function askPdfQuestion(question) {
   }
 
   pdfQuestionInFlight = true;
-  setPdfChatBusy(true);
+  setPdfChatBusy(true, "Pensando...");
   appendPdfChatMessage("user", question);
-  const pending = appendPdfChatMessage("assistant", "Estoy preparando el texto del documento. La primera pregunta puede tardar un poco; luego respondere mas rapido.");
+  const thinking = appendPdfThinkingMessage();
+  const pending = thinking?.element;
   if (!pending) {
     pdfQuestionInFlight = false;
     setPdfChatBusy(false);
@@ -2103,24 +2178,35 @@ async function askPdfQuestion(question) {
       throw new Error(data?.message || data?.detail || "No se pudo consultar el documento.");
     }
 
-    pending.querySelector("p").innerHTML = formatPdfChatText(data?.answer || "No encontr\u00e9 una respuesta en el documento.");
+    thinking?.stop();
+    const answerTarget = pending.querySelector("p");
+    if (answerTarget) {
+      answerTarget.innerHTML = formatPdfChatText(data?.answer || "No encontr\u00e9 una respuesta en el documento.");
+    }
   } catch (error) {
-    pending.querySelector("p").innerHTML = formatPdfChatText(error.message || "No se pudo consultar el documento.");
+    thinking?.stop();
+    const answerTarget = pending.querySelector("p");
+    if (answerTarget) {
+      answerTarget.innerHTML = formatPdfChatText(error.message || "No se pudo consultar el documento.");
+    }
   } finally {
     pdfQuestionInFlight = false;
     setPdfChatBusy(false);
   }
 }
 
-function setPdfChatBusy(isBusy) {
+function setPdfChatBusy(isBusy, label) {
   if (pdfQuestionInput) {
     pdfQuestionInput.disabled = isBusy;
+    pdfQuestionInput.placeholder = pdfDocumentPreparing
+      ? "Preparando documento..."
+      : "Haz una pregunta...";
   }
 
   const submitButton = pdfChatForm?.querySelector("button[type='submit']");
   if (submitButton) {
     submitButton.disabled = isBusy;
-    submitButton.textContent = isBusy ? "Leyendo..." : "Enviar";
+    submitButton.textContent = isBusy ? (label || "Pensando...") : "Enviar";
   }
 
   document.querySelectorAll("[data-pdf-question]").forEach((button) => {
@@ -2142,6 +2228,50 @@ function appendPdfChatMessage(role, text) {
   pdfChatMessages.appendChild(item);
   pdfChatMessages.scrollTop = pdfChatMessages.scrollHeight;
   return item;
+}
+
+function appendPdfThinkingMessage(customSteps) {
+  if (!pdfChatMessages) {
+    return null;
+  }
+
+  const steps = customSteps || [
+    "Leyendo el documento abierto",
+    "Buscando secciones y numerales relevantes",
+    "Revisando evidencia del PDF",
+    "Razonando la respuesta con Gemini"
+  ];
+  let stepIndex = 0;
+
+  const item = document.createElement("div");
+  item.className = "pdf-chat-message assistant thinking";
+  item.setAttribute("aria-live", "polite");
+  item.innerHTML = `
+    <strong>Gemini</strong>
+    <p>
+      <span class="thinking-status">${steps[stepIndex]}</span>
+      <span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    </p>
+  `;
+  pdfChatMessages.appendChild(item);
+  pdfChatMessages.scrollTop = pdfChatMessages.scrollHeight;
+
+  const status = item.querySelector(".thinking-status");
+  const timer = window.setInterval(() => {
+    stepIndex = (stepIndex + 1) % steps.length;
+    if (status) {
+      status.textContent = steps[stepIndex];
+    }
+    pdfChatMessages.scrollTop = pdfChatMessages.scrollHeight;
+  }, 1800);
+
+  return {
+    element: item,
+    stop() {
+      window.clearInterval(timer);
+      item.classList.remove("thinking");
+    }
+  };
 }
 
 function formatPdfChatText(value) {

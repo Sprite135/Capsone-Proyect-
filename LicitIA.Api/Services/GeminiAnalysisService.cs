@@ -1,7 +1,9 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using System.Net;
+using System.Text.RegularExpressions;
 using LicitIA.Api.Configuration;
 using LicitIA.Api.Models;
 using Microsoft.Extensions.Options;
@@ -10,6 +12,10 @@ namespace LicitIA.Api.Services;
 
 public sealed class GeminiAnalysisService
 {
+    private const int MaxQuestionContextChars = 26000;
+    private const int DocumentChunkChars = 4200;
+    private const int MaxRelevantChunks = 6;
+
     private readonly HttpClient _httpClient;
     private readonly GeminiOptions _options;
 
@@ -149,7 +155,10 @@ public sealed class GeminiAnalysisService
         {
             new GeminiContent(new[]
             {
-                GeminiPart.FromText(BuildDocumentQuestionFromTextPrompt(opportunity, extractedDocumentText, question))
+                GeminiPart.FromText(BuildDocumentQuestionFromTextPrompt(
+                    opportunity,
+                    SelectRelevantDocumentContext(extractedDocumentText, question),
+                    question))
             })
         });
 
@@ -159,7 +168,7 @@ public sealed class GeminiAnalysisService
 
     private async Task<string> PostToGeminiAsync(GeminiRequest request, CancellationToken cancellationToken)
     {
-        var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(Model)}:generateContent?key={Uri.EscapeDataString(_options.ApiKey)}";
+        var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(Model)}:generateContent";
 
         var retryDelays = new[]
         {
@@ -172,7 +181,13 @@ public sealed class GeminiAnalysisService
         {
             try
             {
-                using var response = await _httpClient.PostAsJsonAsync(endpoint, request, cancellationToken);
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                {
+                    Content = JsonContent.Create(request)
+                };
+                httpRequest.Headers.TryAddWithoutValidation("X-goog-api-key", _options.ApiKey);
+
+                using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
@@ -382,7 +397,7 @@ public sealed class GeminiAnalysisService
         Descripcion: {{opportunity.Summary}}
         Fecha de cierre: {{opportunity.ClosingDate:yyyy-MM-dd HH:mm}}
 
-        Texto/contexto extraido del documento:
+        Fragmentos relevantes del documento extraido:
         {{extractedDocumentText}}
 
         Pregunta del usuario:
@@ -390,6 +405,8 @@ public sealed class GeminiAnalysisService
 
         Reglas:
         - Responde en espanol claro y accionable.
+        - Los fragmentos fueron seleccionados desde el documento completo por relevancia; tratalos como evidencia del documento abierto.
+        - Si la pregunta menciona un numeral exacto como 4.1, 3.2 o 2.1, responde desde ese numeral exacto o sus subpuntos cercanos. No respondas desde otra seccion aunque tenga palabras parecidas.
         - Busca por terminos literales y relacionados. Si preguntan por "capitulo 4", revisa tambien secciones 4.1, 4.2, 4.3, etc.
         - Si encuentras informacion relacionada, responde directamente y menciona capitulo/seccion/pagina aproximada si aparece.
         - Si el usuario pregunta por requisitos, separa documentos, experiencia, garantias, plazos y condiciones cuando existan.
@@ -397,7 +414,220 @@ public sealed class GeminiAnalysisService
         - Si pregunta por penalidades o sanciones, lista causas, porcentajes/montos y condiciones si aparecen.
         - No inventes datos que no esten en el contexto extraido.
         - Solo di "No encontre informacion sobre ese punto en el documento abierto" si el contexto no contiene nada relacionado.
+        - Si los fragmentos no son suficientes para una respuesta exacta, di que la evidencia disponible es parcial y explica lo que si aparece.
         """;
+
+    private static string SelectRelevantDocumentContext(string extractedDocumentText, string question)
+    {
+        if (string.IsNullOrWhiteSpace(extractedDocumentText))
+        {
+            return "No se extrajo texto del documento.";
+        }
+
+        if (extractedDocumentText.Length <= MaxQuestionContextChars)
+        {
+            return extractedDocumentText;
+        }
+
+        var chunks = SplitDocumentIntoChunks(extractedDocumentText).ToList();
+        var terms = BuildSearchTerms(question);
+        var selected = chunks
+            .Select((chunk, index) => new
+            {
+                Chunk = chunk,
+                Index = index + 1,
+                Score = ScoreChunk(chunk, terms, question)
+            })
+            .OrderByDescending(item => item.Score)
+            .ThenBy(item => item.Index)
+            .Take(MaxRelevantChunks)
+            .OrderBy(item => item.Index)
+            .ToList();
+
+        if (selected.Count == 0 || selected.All(item => item.Score <= 0))
+        {
+            selected = chunks
+                .Take(Math.Min(MaxRelevantChunks, chunks.Count))
+                .Select((chunk, index) => new
+                {
+                    Chunk = chunk,
+                    Index = index + 1,
+                    Score = 0
+                })
+                .ToList();
+        }
+
+        var builder = new StringBuilder();
+        foreach (var item in selected)
+        {
+            builder.AppendLine($"--- Fragmento {item.Index}. Referencia aproximada: {FindChunkReference(item.Chunk)} ---");
+            builder.AppendLine(item.Chunk.Trim());
+            builder.AppendLine();
+
+            if (builder.Length >= MaxQuestionContextChars)
+            {
+                break;
+            }
+        }
+
+        return builder.Length <= MaxQuestionContextChars
+            ? builder.ToString()
+            : builder.ToString()[..MaxQuestionContextChars];
+    }
+
+    private static IEnumerable<string> SplitDocumentIntoChunks(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+        for (var start = 0; start < normalized.Length; start += DocumentChunkChars)
+        {
+            var length = Math.Min(DocumentChunkChars, normalized.Length - start);
+            var end = start + length;
+            if (end < normalized.Length)
+            {
+                var paragraphBreak = normalized.LastIndexOf("\n\n", end - 1, length, StringComparison.Ordinal);
+                if (paragraphBreak > start + 800)
+                {
+                    end = paragraphBreak + 2;
+                    length = end - start;
+                }
+            }
+
+            yield return normalized.Substring(start, length);
+            start = end - DocumentChunkChars;
+        }
+    }
+
+    private static List<string> BuildSearchTerms(string question)
+    {
+        var normalized = NormalizeForSearch(question);
+        var terms = normalized
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(term => term.Length >= 4)
+            .Distinct()
+            .ToList();
+
+        AddRelatedTerms(terms, normalized);
+        return terms;
+    }
+
+    private static void AddRelatedTerms(List<string> terms, string normalizedQuestion)
+    {
+        void Add(params string[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!terms.Contains(value))
+                {
+                    terms.Add(value);
+                }
+            }
+        }
+
+        if (normalizedQuestion.Contains("admision") || normalizedQuestion.Contains("admisibilidad"))
+        {
+            Add("admision", "admisibilidad", "documentacion", "obligatoria", "oferta", "anexo");
+        }
+
+        if (normalizedQuestion.Contains("evaluacion") || normalizedQuestion.Contains("puntaje") || normalizedQuestion.Contains("criterio"))
+        {
+            Add("evaluacion", "puntaje", "criterios", "factor", "calificacion", "bonificacion");
+        }
+
+        if (normalizedQuestion.Contains("penal") || normalizedQuestion.Contains("multa") || normalizedQuestion.Contains("sancion"))
+        {
+            Add("penalidad", "penalidades", "multa", "sancion", "incumplimiento");
+        }
+
+        if (normalizedQuestion.Contains("apelacion") || normalizedQuestion.Contains("recurso"))
+        {
+            Add("apelacion", "recurso", "impugnacion", "tribunal", "plazo");
+        }
+
+        if (normalizedQuestion.Contains("contrato") || normalizedQuestion.Contains("perfeccionamiento"))
+        {
+            Add("contrato", "perfeccionamiento", "garantia", "firma", "buena", "pro");
+        }
+
+        if (normalizedQuestion.Contains("etapa") || normalizedQuestion.Contains("comparacion") || normalizedQuestion.Contains("precio"))
+        {
+            Add("etapas", "comparacion", "precios", "convocatoria", "evaluacion", "otorgamiento");
+        }
+
+        if (normalizedQuestion.Contains("especificacion") || normalizedQuestion.Contains("tecnica") || normalizedQuestion.Contains("caracteristica"))
+        {
+            Add("especificaciones", "tecnicas", "caracteristicas", "requerimiento", "cantidad", "entrega");
+        }
+    }
+
+    private static int ScoreChunk(string chunk, List<string> terms, string question)
+    {
+        var normalized = NormalizeForSearch(chunk);
+        var score = 0;
+
+        foreach (Match match in Regex.Matches(question, @"\b\d{1,2}\.\d{1,2}(?:\.\d{1,2})?\b"))
+        {
+            var section = match.Value;
+            var sectionWithSpaces = section.Replace('.', ' ');
+            if (chunk.Contains(section, StringComparison.OrdinalIgnoreCase) ||
+                normalized.Contains(sectionWithSpaces, StringComparison.OrdinalIgnoreCase))
+            {
+                score += 100;
+            }
+        }
+
+        foreach (var term in terms)
+        {
+            var matches = normalized.Split(term, StringSplitOptions.None).Length - 1;
+            score += matches * (term.Length >= 8 ? 4 : 2);
+        }
+
+        if (normalized.Contains("capitulo"))
+        {
+            score += 2;
+        }
+
+        if (normalized.Contains("anexo") || normalized.Contains("requisito") || normalized.Contains("documentacion"))
+        {
+            score += 2;
+        }
+
+        return score;
+    }
+
+    private static string FindChunkReference(string chunk)
+    {
+        var lines = chunk.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var reference = lines.FirstOrDefault(line =>
+            line.Contains("pagina", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("capitulo", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("seccion", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("anexo", StringComparison.OrdinalIgnoreCase));
+
+        return string.IsNullOrWhiteSpace(reference)
+            ? "sin referencia visible"
+            : reference.Length <= 140 ? reference : reference[..140];
+    }
+
+    private static string NormalizeForSearch(string value)
+    {
+        var normalized = value.ToLowerInvariant()
+            .Replace('á', 'a')
+            .Replace('é', 'e')
+            .Replace('í', 'i')
+            .Replace('ó', 'o')
+            .Replace('ú', 'u')
+            .Replace('ñ', 'n');
+
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            builder.Append(char.IsLetterOrDigit(character) ? character : ' ');
+        }
+
+        return string.Join(' ', builder
+            .ToString()
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
 
     private static string ExtractText(string body)
     {

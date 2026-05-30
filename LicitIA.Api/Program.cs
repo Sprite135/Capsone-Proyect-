@@ -377,6 +377,95 @@ app.MapDelete("/api/opportunities/{id:int}/documents/{documentIndex:int}/cache",
     return Results.NoContent();
 });
 
+app.MapPost("/api/opportunities/{id:int}/documents/{documentIndex:int}/prepare", async (
+    int id,
+    int documentIndex,
+    OpportunityRepository opportunityRepository,
+    SeaceScraperService seaceScraperService,
+    SeaceDocumentTextService documentTextService,
+    GeminiAnalysisService geminiService,
+    IMemoryCache documentCache,
+    HttpContext httpContext,
+    IOptions<JwtOptions> jwtOptions,
+    CancellationToken cancellationToken) =>
+{
+    var userId = GetAuthenticatedUserId(httpContext, jwtOptions.Value);
+    if (!userId.HasValue)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!geminiService.IsConfigured)
+    {
+        return Results.BadRequest(new { message = "Gemini no esta configurado." });
+    }
+
+    try
+    {
+        var opportunity = await opportunityRepository.GetByIdAsync(id, cancellationToken);
+        if (opportunity is null)
+        {
+            return Results.NotFound(new { message = "No se encontro la oportunidad solicitada." });
+        }
+
+        var document = await GetOrFetchSeaceDocumentAsync(
+            documentCache,
+            opportunity,
+            documentIndex,
+            seaceScraperService,
+            cancellationToken);
+        if (document is null || document.Content.Length == 0)
+        {
+            return Results.NotFound(new { message = "No se pudo obtener el documento desde SEACE." });
+        }
+
+        if (!IsPdfDocument(document))
+        {
+            return Results.BadRequest(new { message = "El documento no es PDF. Usa Descargar para abrir este archivo." });
+        }
+
+        var documentContext = GetOrBuildSeaceDocumentContext(
+            documentCache,
+            opportunity.OpportunityId,
+            documentIndex,
+            document,
+            documentTextService);
+
+        var extractedText = await GetOrExtractSeaceDocumentTextAsync(
+            documentCache,
+            opportunity,
+            documentIndex,
+            documentContext,
+            geminiService,
+            cancellationToken);
+
+        return Results.Ok(new
+        {
+            ready = true,
+            textLength = extractedText.Length
+        });
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        return Results.BadRequest(new { message = "Indice de documento invalido." });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(
+            title: "No se pudo preparar el documento.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SeaceDocumentPrepare] Error preparando documento: {ex.Message}");
+        return Results.Problem(
+            title: "No se pudo preparar el documento.",
+            detail: "Revisa la conexion con SEACE y vuelve a intentar.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.MapPost("/api/opportunities/{id:int}/documents/{documentIndex:int}/ask", async (
     int id,
     int documentIndex,
