@@ -129,13 +129,15 @@ public class SeaceScraperService
 
             var callYear = opportunity.PublishedDate?.Year ?? DateTime.UtcNow.Year;
             await ApplyCallYearFilterAsync(page, callYear);
-            await EnsureAdvancedSearchExpandedAsync(page, opportunity.ProcessCode);
-            await ApplyEntityAcronymFilterAsync(page, opportunity.ProcessCode);
-
+            await WaitForPrimeFacesIdleAsync(page);
             if (!string.IsNullOrWhiteSpace(opportunity.ContractObject))
             {
                 await ApplyContractObjectFilterAsync(page, opportunity.ContractObject);
             }
+
+            await EnsureAdvancedSearchExpandedAsync(page, opportunity.ProcessCode);
+            await WaitForPrimeFacesIdleAsync(page);
+            await ApplyEntityAcronymFilterAsync(page, opportunity.ProcessCode);
 
             await ClickSearchButtonAsync(page);
             await WaitForSearchResultsAsync(page, opportunity.ProcessCode);
@@ -444,8 +446,10 @@ public class SeaceScraperService
             }
 
             await ApplyCallYearFilterAsync(page, callYear);
+            await WaitForPrimeFacesIdleAsync(page);
             await ApplyContractObjectFilterAsync(page, contractObject);
             await EnsureAdvancedSearchExpandedAsync(page, entityAcronym, department, province, district);
+            await WaitForPrimeFacesIdleAsync(page);
             await ApplyEntityAcronymFilterAsync(page, entityAcronym);
             await ApplyDepartmentFilterAsync(page, department);
             await ApplyProvinceFilterAsync(page, province);
@@ -1481,6 +1485,7 @@ public class SeaceScraperService
 
             if (selected)
             {
+                await WaitForPrimeFacesIdleAsync(page);
                 await Task.Delay(500);
                 var selectedLabel = await page.TextContentAsync("#tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria_label");
                 Console.WriteLine($"[SeaceScraper] Anio de Convocatoria seleccionado en UI: {selectedLabel}");
@@ -1518,11 +1523,45 @@ public class SeaceScraperService
             Console.WriteLine(applied
                 ? "[SeaceScraper] Filtro Anio de Convocatoria aplicado por JavaScript como fallback."
                 : "[SeaceScraper] No se encontro el combo anioConvocatoria.");
+            await WaitForPrimeFacesIdleAsync(page);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SeaceScraper] Error aplicando filtro Anio de Convocatoria: {ex.Message}");
         }
+    }
+
+    private async Task WaitForPrimeFacesIdleAsync(IPage page, int timeoutMs = 10000)
+    {
+        try
+        {
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const primeFacesIdle = !window.PrimeFaces
+                        || !PrimeFaces.ajax
+                        || !PrimeFaces.ajax.Queue
+                        || PrimeFaces.ajax.Queue.isEmpty();
+                    const jqueryIdle = !window.jQuery || jQuery.active === 0;
+                    const overlaysHidden = Array.from(document.querySelectorAll('.ui-blockui, .ui-widget-overlay'))
+                        .every(el => {
+                            const style = window.getComputedStyle(el);
+                            return el.offsetParent === null || style.display === 'none' || style.visibility === 'hidden';
+                        });
+
+                    return primeFacesIdle && jqueryIdle && overlaysHidden;
+                }",
+                null,
+                new PageWaitForFunctionOptions
+                {
+                    Timeout = timeoutMs
+                });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeaceScraper] No se confirmo fin de AJAX de PrimeFaces: {ex.Message}");
+        }
+
+        await Task.Delay(300);
     }
 
     private async Task ApplyContractObjectFilterAsync(IPage page, string? contractObject)
@@ -1538,37 +1577,130 @@ public class SeaceScraperService
 
         try
         {
-            const string labelSelector = "#tbBuscador\\:idFormBuscarProceso\\:j_idt188_label";
-            const string panelSelector = "#tbBuscador\\:idFormBuscarProceso\\:j_idt188_panel";
+            await WaitForPrimeFacesIdleAsync(page);
 
-            await page.WaitForSelectorAsync(labelSelector, new PageWaitForSelectorOptions
-            {
-                Timeout = 10000
-            });
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const findRoot = () => {
+                        const fixedRoot = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt211');
+                        if (fixedRoot) return fixedRoot;
+
+                        const cells = Array.from(document.querySelectorAll('td, th'));
+                        const labelCell = cells.find(cell => normalize(cell.textContent) === 'objeto de contratacion');
+                        let current = labelCell?.nextElementSibling;
+
+                        while (current) {
+                            const root = current.querySelector('.ui-selectonemenu');
+                            if (root) return root;
+                            if (normalize(current.textContent).includes('tipo de seleccion')) break;
+                            current = current.nextElementSibling;
+                        }
+
+                        return null;
+                    };
+
+                    return Boolean(findRoot());
+                }",
+                null,
+                new PageWaitForFunctionOptions
+                {
+                    Timeout = 10000
+                });
 
             var opened = await page.EvaluateAsync<bool>(
                 @"() => {
-                    const root = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt188');
-                    const label = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt188_label');
-                    const trigger = root?.querySelector('.ui-selectonemenu-trigger');
-                    const clickable = trigger || label || root;
-                    if (!clickable) return false;
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
 
+                    const findRoot = () => {
+                        const fixedRoot = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt211');
+                        if (fixedRoot) return fixedRoot;
+
+                        const cells = Array.from(document.querySelectorAll('td, th'));
+                        const labelCell = cells.find(cell => normalize(cell.textContent) === 'objeto de contratacion');
+                        let current = labelCell?.nextElementSibling;
+
+                        while (current) {
+                            const root = current.querySelector('.ui-selectonemenu');
+                            if (root) return root;
+                            if (normalize(current.textContent).includes('tipo de seleccion')) break;
+                            current = current.nextElementSibling;
+                        }
+
+                        return null;
+                    };
+
+                    const root = findRoot();
+                    if (!root) return false;
+
+                    const trigger = root?.querySelector('.ui-selectonemenu-trigger');
+                    const label = root.querySelector('.ui-selectonemenu-label') || document.getElementById(root.id + '_label');
+                    const clickable = trigger || label || root;
+                    clickable.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                    clickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    clickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
                     clickable.click();
                     return true;
                 }");
 
-            Console.WriteLine(opened
-                ? "[SeaceScraper] Combo Objeto de Contratacion abierto."
-                : "[SeaceScraper] No se pudo abrir el combo j_idt188 de Objeto de Contratacion.");
-
-            await page.WaitForSelectorAsync($"{panelSelector} li.ui-selectonemenu-item", new PageWaitForSelectorOptions
+            if (!opened)
             {
-                State = WaitForSelectorState.Visible,
-                Timeout = 10000
-            });
+                Console.WriteLine("[SeaceScraper] No se pudo abrir el combo j_idt211 de Objeto de Contratacion.");
+            }
+            else
+            {
+                Console.WriteLine("[SeaceScraper] Combo Objeto de Contratacion abierto.");
+            }
 
-            var selectedByKnownId = await page.EvaluateAsync<bool>(
+            await page.WaitForFunctionAsync(
+                @"() => {
+                    const normalize = (value) => String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+
+                    const findRoot = () => {
+                        const fixedRoot = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt211');
+                        if (fixedRoot) return fixedRoot;
+
+                        const cells = Array.from(document.querySelectorAll('td, th'));
+                        const labelCell = cells.find(cell => normalize(cell.textContent) === 'objeto de contratacion');
+                        let current = labelCell?.nextElementSibling;
+
+                        while (current) {
+                            const root = current.querySelector('.ui-selectonemenu');
+                            if (root) return root;
+                            if (normalize(current.textContent).includes('tipo de seleccion')) break;
+                            current = current.nextElementSibling;
+                        }
+
+                        return null;
+                    };
+
+                    const root = findRoot();
+                    const panel = root?.id ? document.getElementById(root.id + '_panel') : null;
+                    return Boolean(panel && panel.querySelector('li.ui-selectonemenu-item'));
+                }",
+                null,
+                new PageWaitForFunctionOptions
+                {
+                    Timeout = 10000
+                });
+
+            var selected = await page.EvaluateAsync<bool>(
                 @"(optionText) => {
                     const normalize = (value) => String(value || '')
                         .normalize('NFD')
@@ -1577,7 +1709,26 @@ public class SeaceScraperService
                         .trim()
                         .toLowerCase();
 
-                    const panel = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt188_panel');
+                    const findRoot = () => {
+                        const fixedRoot = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt211');
+                        if (fixedRoot) return fixedRoot;
+
+                        const cells = Array.from(document.querySelectorAll('td, th'));
+                        const labelCell = cells.find(cell => normalize(cell.textContent) === 'objeto de contratacion');
+                        let current = labelCell?.nextElementSibling;
+
+                        while (current) {
+                            const root = current.querySelector('.ui-selectonemenu');
+                            if (root) return root;
+                            if (normalize(current.textContent).includes('tipo de seleccion')) break;
+                            current = current.nextElementSibling;
+                        }
+
+                        return null;
+                    };
+
+                    const root = findRoot();
+                    const panel = root?.id ? document.getElementById(root.id + '_panel') : null;
                     if (!panel) return false;
 
                     const target = normalize(optionText);
@@ -1590,22 +1741,32 @@ public class SeaceScraperService
                 }",
                 optionText);
 
-            if (selectedByKnownId)
+            if (selected)
             {
+                await WaitForPrimeFacesIdleAsync(page);
                 await Task.Delay(500);
-                var selectedLabel = await page.TextContentAsync(labelSelector);
+                var selectedLabel = await page.EvaluateAsync<string>(
+                    @"() => {
+                        const root = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt211')
+                            || Array.from(document.querySelectorAll('td, th'))
+                                .find(cell => String(cell.textContent || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() === 'objeto de contratacion')
+                                ?.nextElementSibling
+                                ?.querySelector('.ui-selectonemenu');
+                        const label = root?.querySelector('.ui-selectonemenu-label') || (root?.id ? document.getElementById(root.id + '_label') : null);
+                        return (label?.textContent || '').trim();
+                    }");
                 Console.WriteLine($"[SeaceScraper] Objeto de Contratacion seleccionado en UI: {selectedLabel}");
                 return;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Objeto de Contratacion con j_idt188: {ex.Message}");
+            Console.WriteLine($"[SeaceScraper] No se pudo seleccionar Objeto de Contratacion desde el combo visible j_idt211: {ex.Message}");
         }
 
         try
         {
-            var selected = await page.EvaluateAsync<bool>(
+            var applied = await page.EvaluateAsync<bool>(
                 @"(optionText) => {
                     const normalize = (value) => String(value || '')
                         .normalize('NFD')
@@ -1614,55 +1775,47 @@ public class SeaceScraperService
                         .trim()
                         .toLowerCase();
 
-                    const target = normalize(optionText);
-                    const directIds = [
-                        'tbBuscador:idFormBuscarProceso:j_idt188',
-                        'tbBuscador:idFormBuscarProceso:objetoContratacion',
-                        'tbBuscador:idFormBuscarProceso:objetoContrato',
-                        'tbBuscador:idFormBuscarProceso:tipoObjetoContratacion'
-                    ];
+                    const findRoot = () => {
+                        const fixedRoot = document.getElementById('tbBuscador:idFormBuscarProceso:j_idt211');
+                        if (fixedRoot) return fixedRoot;
 
-                    let root = directIds.map(id => document.getElementById(id)).find(Boolean);
-                    if (!root) {
-                        const labels = Array.from(document.querySelectorAll('label, td, th, span, div'))
-                            .filter(el => normalize(el.textContent).includes('objeto de contratacion'));
+                        const cells = Array.from(document.querySelectorAll('td, th'));
+                        const labelCell = cells.find(cell => normalize(cell.textContent) === 'objeto de contratacion');
+                        let current = labelCell?.nextElementSibling;
 
-                        for (const label of labels) {
-                            const row = label.closest('tr') || label.parentElement;
-                            root = row?.querySelector('.ui-selectonemenu') ||
-                                row?.nextElementSibling?.querySelector?.('.ui-selectonemenu');
-                            if (root) break;
+                        while (current) {
+                            const root = current.querySelector('.ui-selectonemenu');
+                            if (root) return root;
+                            if (normalize(current.textContent).includes('tipo de seleccion')) break;
+                            current = current.nextElementSibling;
                         }
+
+                        return null;
+                    };
+
+                    const root = findRoot();
+                    const rootId = root?.id || 'tbBuscador:idFormBuscarProceso:j_idt211';
+                    const label = root?.querySelector('.ui-selectonemenu-label')
+                        || document.getElementById(rootId + '_label');
+                    const hidden = document.getElementById(rootId + '_input')
+                        || document.querySelector(`input[name='${rootId}_input']`)
+                        || document.querySelector(`select[name='${rootId}_input']`);
+
+                    if (label) label.textContent = optionText;
+
+                    if (hidden) {
+                        hidden.value = optionText;
+                        hidden.dispatchEvent(new Event('input', { bubbles: true }));
+                        hidden.dispatchEvent(new Event('change', { bubbles: true }));
                     }
 
-                    if (!root) return false;
-
-                    const rootId = root.id;
-                    const label = document.getElementById(rootId + '_label') || root.querySelector('.ui-selectonemenu-label');
-                    const trigger = root.querySelector('.ui-selectonemenu-trigger');
-                    (trigger || label || root).click();
-
-                    const panels = Array.from(document.querySelectorAll('.ui-selectonemenu-panel'));
-                    const panel = document.getElementById(rootId + '_panel') ||
-                        panels.reverse().find(item => item.offsetParent !== null) ||
-                        panels[0];
-                    if (!panel) return false;
-
-                    const items = Array.from(panel.querySelectorAll('li.ui-selectonemenu-item, li'));
-                    const option = items.find(item => normalize(item.getAttribute('data-label') || item.textContent) === target);
-                    if (!option) return false;
-
-                    option.click();
-                    return true;
+                    return Boolean(root || label || hidden);
                 }",
                 optionText);
 
-            if (selected)
-            {
-                await Task.Delay(500);
-                Console.WriteLine("[SeaceScraper] Objeto de Contratacion seleccionado en UI por fallback.");
-                return;
-            }
+            Console.WriteLine(applied
+                ? "[SeaceScraper] Filtro Objeto de Contratacion aplicado por JavaScript como fallback."
+                : "[SeaceScraper] No se encontro el combo Objeto de Contratacion.");
         }
         catch (Exception ex)
         {
@@ -1672,15 +1825,36 @@ public class SeaceScraperService
 
     private static string NormalizeContractObjectOption(string? value)
     {
-        var normalized = NormalizeLabel(value ?? string.Empty).ToLowerInvariant();
-        return normalized switch
+        var normalized = NormalizeLabel(value ?? string.Empty)
+            .ToLowerInvariant()
+            .Replace("Ã", string.Empty)
+            .Replace("­", string.Empty)
+            .Replace("\u00ad", string.Empty);
+
+        normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
+
+        if (normalized.Contains("consultor", StringComparison.OrdinalIgnoreCase) &&
+            normalized.Contains("obra", StringComparison.OrdinalIgnoreCase))
         {
-            "bien" => "Bien",
-            "consultoria de obra" => "Consultor\u00eda de Obra",
-            "obra" => "Obra",
-            "servicio" => "Servicio",
-            _ => string.Empty
-        };
+            return "Consultor\u00eda de Obra";
+        }
+
+        if (normalized.Contains("servicio", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Servicio";
+        }
+
+        if (normalized.Contains("bien", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Bien";
+        }
+
+        if (normalized.Contains("obra", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Obra";
+        }
+
+        return string.Empty;
     }
 
     private async Task EnsureAdvancedSearchExpandedAsync(IPage page, params string?[] advancedValues)
@@ -1739,10 +1913,13 @@ public class SeaceScraperService
                 @"() => {
                     const input = document.getElementById('tbBuscador:idFormBuscarProceso:siglasEntidad');
                     const departamento = document.getElementById('tbBuscador:idFormBuscarProceso:departamento_label');
-                    return Boolean((input && input.offsetParent !== null) || (departamento && departamento.offsetParent !== null));
+                    return Boolean((input && input.offsetParent !== null)
+                        || (departamento && departamento.offsetParent !== null));
                 }",
                 null,
                 new PageWaitForFunctionOptions { Timeout = 10000 });
+
+            await WaitForPrimeFacesIdleAsync(page);
         }
         catch (Exception ex)
         {

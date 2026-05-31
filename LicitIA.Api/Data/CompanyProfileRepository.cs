@@ -282,6 +282,32 @@ public class CompanyProfileRepository
 
     private static string NormalizeSeaceContractObject(string? value)
     {
+        var safeValue = (value ?? string.Empty).Trim().ToLowerInvariant();
+        safeValue = safeValue
+            .Replace("í", "i")
+            .Replace("Ã", string.Empty)
+            .Replace("­", string.Empty)
+            .Replace("\u00ad", string.Empty);
+
+        if (safeValue.Contains("consultor") && safeValue.Contains("obra"))
+        {
+            return "Consultoría de Obra";
+        }
+
+        if (safeValue.Contains("servicio"))
+        {
+            return "Servicio";
+        }
+
+        if (safeValue.Contains("bien"))
+        {
+            return "Bien";
+        }
+
+        if (safeValue.Contains("obra"))
+        {
+            return "Obra";
+        }
         var normalized = value?.Trim() ?? string.Empty;
         return normalized is "Bien" or "Consultoría de Obra" or "Consultoria de Obra" or "Obra" or "Servicio"
             ? normalized
